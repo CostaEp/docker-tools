@@ -14,8 +14,17 @@ if command -v docker &> /dev/null; then
 elif command -v podman &> /dev/null; then
     ENGINE="podman"
 else
-    echo "❌ Error: Neither Docker nor Podman is installed on this system."
-    exit 1
+    echo "⚠️ Neither Docker nor Podman is installed. Attempting offline Podman installation..."
+    if [ -f "./install-podman-offline.sh" ]; then
+        chmod +x ./install-podman-offline.sh
+        ./install-podman-offline.sh
+    fi
+    if command -v podman &> /dev/null; then
+        ENGINE="podman"
+    else
+        echo "❌ Error: Neither Docker nor Podman is installed, and offline installation could not complete."
+        exit 1
+    fi
 fi
 
 echo "✓ Detected container engine: $ENGINE"

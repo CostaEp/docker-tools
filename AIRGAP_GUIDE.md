@@ -57,7 +57,7 @@
 
 1. **הפעלת שירות ה-Socket של Podman ב-RHEL 9 (מידע חד פעמי):**
    ```bash
-   sudo systemctl enable --now podman.socket
+   systemctl enable --now podman.socket
    ```
 
 2. **טעינת האימג' ב-Podman:**
