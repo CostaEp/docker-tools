@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-07-22 — Specification Exporter & Helm Chart Release
+
+### Added
+- **Container Build Specification Exporter**:
+  - Reverse-engineer container inspection metadata into valid `docker-compose.yml` service definitions.
+  - Reconstruct `Dockerfile` directives (`FROM`, `USER`, `WORKDIR`, `ENV`, `EXPOSE`, `VOLUME`, `ENTRYPOINT`, `CMD`).
+  - Generate Kubernetes `Pod` manifests (`pod.yaml`).
+- **Helm Chart Generator**:
+  - Automatically construct complete, parameterized Helm Charts (`Chart.yaml`, `values.yaml`, `templates/deployment.yaml`, `templates/service.yaml`, `templates/_helpers.tpl`).
+  - Interactive template file switcher, single-click copy to clipboard, and individual template file download.
+- **Air-Gap Packaging**:
+  - Updated offline release bundler `package-release.sh` generating `dockerforge-release-v1.1.0.tar.gz`.
+
+---
+
 ## [1.0.0] - 2026-07-21 — Production Release (Air-Gapped Enterprise Edition)
 
 ### Added

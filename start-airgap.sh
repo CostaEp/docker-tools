@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# DockerForge v1.0.0 — Air-Gapped RHEL 9 / Podman / Docker Startup Script
+# DockerForge v1.1.0 — Air-Gapped RHEL 9 / Podman / Docker Startup Script
 # ==============================================================================
 
 set -e
 
-echo "🐳 DockerForge v1.0.0 — Air-Gapped Enterprise Setup"
+echo "🐳 DockerForge v1.1.0 — Air-Gapped Enterprise Setup"
 echo "===================================================="
 
 # Detect container engine (docker or podman)
@@ -21,8 +21,12 @@ fi
 echo "✓ Detected container engine: $ENGINE"
 
 # Load offline tar image if present
-IMAGE_TAR="dockerforge-1.0.0-image.tar"
-if [ -f "$IMAGE_TAR" ]; then
+IMAGE_TAR=$(ls dockerforge-*-image.tar 2>/dev/null | head -n 1)
+if [ -z "$IMAGE_TAR" ] && [ -f "dockerforge-1.1.0-image.tar" ]; then
+    IMAGE_TAR="dockerforge-1.1.0-image.tar"
+fi
+
+if [ -n "$IMAGE_TAR" ] && [ -f "$IMAGE_TAR" ]; then
     echo "📦 Loading offline image archive ($IMAGE_TAR)..."
     $ENGINE load -i "$IMAGE_TAR"
     echo "✓ Offline image loaded successfully."
