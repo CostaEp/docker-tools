@@ -1,0 +1,100 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.4",
+  "serialNumber": "urn:uuid:d7a253b3-f6b7-4352-8c10-2157359e107e",
+  "version": 1,
+  "metadata": {
+    "timestamp": "2026-07-21T21:00:00Z",
+    "tools": [
+      {
+        "vendor": "DockerForge Security Team",
+        "name": "AuditScanner",
+        "version": "1.0.0"
+      }
+    ],
+    "component": {
+      "group": "com.dockerforge",
+      "name": "dockerforge",
+      "version": "1.0.0",
+      "type": "application"
+    }
+  },
+  "components": [
+    {
+      "type": "library",
+      "name": "express",
+      "version": "4.18.2",
+      "purl": "pkg:npm/express@4.18.2",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "socket.io",
+      "version": "4.7.2",
+      "purl": "pkg:npm/socket.io@4.7.2",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "dockerode",
+      "version": "4.0.2",
+      "purl": "pkg:npm/dockerode@4.0.2",
+      "licenses": [{ "license": { "id": "Apache-2.0" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "cors",
+      "version": "2.8.5",
+      "purl": "pkg:npm/cors@2.8.5",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "express-async-errors",
+      "version": "3.1.1",
+      "purl": "pkg:npm/express-async-errors@3.1.1",
+      "licenses": [{ "license": { "id": "ESMF" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "morgan",
+      "version": "1.10.0",
+      "purl": "pkg:npm/morgan@1.10.0",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "library",
+      "name": "tar-stream",
+      "version": "3.1.6",
+      "purl": "pkg:npm/tar-stream@3.1.6",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "operating-system",
+      "name": "Alpine Linux",
+      "version": "3.20 (node:20-alpine)",
+      "vulnerabilities": []
+    },
+    {
+      "type": "application",
+      "name": "xterm.js",
+      "version": "5.3.0",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    },
+    {
+      "type": "application",
+      "name": "Chart.js",
+      "version": "4.4.0",
+      "licenses": [{ "license": { "id": "MIT" } }],
+      "vulnerabilities": []
+    }
+  ]
+}

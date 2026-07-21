@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  dockerforge:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dockerforge
+    ports:
+      - "9090:3000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - dockerforge_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  dockerforge_data:

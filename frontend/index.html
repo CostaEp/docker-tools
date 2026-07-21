@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DockerForge — Docker Management UI</title>
+  <meta name="description" content="Modern Docker container management dashboard with real-time monitoring, terminal access, and full lifecycle control." />
+  
+  <!-- Offline Fonts & Icons -->
+  <link rel="stylesheet" href="/vendor/phosphor.css" />
+  
+  <!-- Offline Xterm.js -->
+  <link rel="stylesheet" href="/vendor/xterm.css" />
+  
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="url(#grad1)"/>
+            <path d="M8 20h4v4H8zM13 20h4v4h-4zM18 20h4v4h-4zM18 15h4v4h-4zM13 15h4v4h-4zM18 10h4v4h-4zM23 20h4v4h-4zM28.5 19c1.5-1 4-0.5 4.5 2" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <path d="M6 24c0 0 1-2 4-1" stroke="white" stroke-width="2" stroke-linecap="round"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="40" y2="40" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#00c6ff"/>
+                <stop offset="1" stop-color="#3a7bd5"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">DockerForge</span>
+          <span class="brand-version">v1.0.0</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-label">Overview</div>
+        <a href="#dashboard" class="nav-item active" data-page="dashboard">
+          <i class="ph ph-squares-four"></i>
+          <span>Dashboard</span>
+        </a>
+
+        <div class="nav-section-label">Resources</div>
+        <a href="#containers" class="nav-item" data-page="containers">
+          <i class="ph ph-package"></i>
+          <span>Containers</span>
+          <span class="nav-badge" id="badge-containers">0</span>
+        </a>
+        <a href="#images" class="nav-item" data-page="images">
+          <i class="ph ph-stack"></i>
+          <span>Images</span>
+          <span class="nav-badge" id="badge-images">0</span>
+        </a>
+        <a href="#volumes" class="nav-item" data-page="volumes">
+          <i class="ph ph-hard-drives"></i>
+          <span>Volumes</span>
+        </a>
+        <a href="#networks" class="nav-item" data-page="networks">
+          <i class="ph ph-share-network"></i>
+          <span>Networks</span>
+        </a>
+
+        <div class="nav-section-label">Tools</div>
+        <a href="#terminal" class="nav-item" data-page="terminal">
+          <i class="ph ph-terminal-window"></i>
+          <span>Terminal</span>
+        </a>
+        <a href="#logs" class="nav-item" data-page="logs">
+          <i class="ph ph-scroll"></i>
+          <span>Live Logs</span>
+        </a>
+        <a href="#health" class="nav-item" data-page="health">
+          <i class="ph ph-heartbeat"></i>
+          <span>System Health</span>
+        </a>
+        <a href="#cleanup" class="nav-item" data-page="cleanup">
+          <i class="ph ph-broom"></i>
+          <span>Disk Cleanup</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="docker-status" id="dockerStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Connecting...</span>
+        </div>
+        <div class="docker-version" id="dockerVersion">Docker</div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main id="main">
+      <!-- Topbar -->
+      <header id="topbar">
+        <button id="sidebar-toggle" class="icon-btn" title="Toggle sidebar">
+          <i class="ph ph-list"></i>
+        </button>
+        <div class="topbar-title" id="page-title">Dashboard</div>
+        <div class="topbar-actions">
+          <button class="icon-btn" id="refresh-btn" title="Refresh">
+            <i class="ph ph-arrow-clockwise"></i>
+          </button>
+          <button class="btn btn-primary" id="run-container-btn">
+            <i class="ph ph-plus"></i>
+            Run Container
+          </button>
+        </div>
+      </header>
+
+      <!-- Page content -->
+      <div id="page-content">
+        <!-- Pages are rendered dynamically -->
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <!-- Modal container -->
+  <div id="modal-overlay" class="hidden">
+    <div id="modal-container"></div>
+  </div>
+
+  <!-- Scripts (100% Offline Air-Gapped Vendor Assets) -->
+  <script src="/vendor/socket.io.min.js"></script>
+  <script src="/vendor/chart.umd.min.js"></script>
+  <script src="/vendor/xterm.js"></script>
+  <script src="/vendor/xterm-addon-fit.js"></script>
+  <script src="/vendor/xterm-addon-web-links.js"></script>
+
+  <script type="module" src="/main.js"></script>
+</body>
+</html>
