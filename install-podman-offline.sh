@@ -21,14 +21,21 @@ if [ ! -d "$RPM_DIR" ]; then
     exit 1
 fi
 
-echo "1️⃣ Installing Podman RPM packages and dependencies..."
-if command -v dnf &> /dev/null; then
-    dnf install -y --disablerepo=* "${RPM_DIR}"/*.rpm || rpm -ivh --replacepkgs --nodeps "${RPM_DIR}"/*.rpm
-elif command -v yum &> /dev/null; then
-    yum install -y --disablerepo=* "${RPM_DIR}"/*.rpm || rpm -ivh --replacepkgs --nodeps "${RPM_DIR}"/*.rpm
-else
-    rpm -ivh --replacepkgs --nodeps "${RPM_DIR}"/*.rpm
-fi
+echo "1️⃣ Checking existing packages and installing missing Podman components..."
+for rpm in "${RPM_DIR}"/*.rpm; do
+    [ -f "$rpm" ] || continue
+    pkgname=$(rpm -qp --queryformat '%{NAME}' "$rpm" 2>/dev/null || echo "")
+    if [ -n "$pkgname" ] && rpm -q "$pkgname" &>/dev/null; then
+        echo "   ✓ Package $pkgname is already installed, skipping..."
+    else
+        echo "   📦 Installing $(basename "$rpm")..."
+        if command -v dnf &> /dev/null; then
+            dnf install -y --disablerepo=* "$rpm" || rpm -Uvh "$rpm" || true
+        else
+            rpm -Uvh "$rpm" || true
+        fi
+    fi
+done
 
 echo "2️⃣ Enabling Podman socket service for Docker API compatibility..."
 if command -v systemctl &> /dev/null; then
