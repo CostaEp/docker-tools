@@ -133,9 +133,9 @@ export async function renderCompose(container) {
     </div>
 
     <!-- Add Service Modal -->
-    <div id="add-service-modal" class="hidden" style="
-      position:fixed;inset:0;background:rgba(0,0,0,0.6);
-      display:flex;align-items:center;justify-content:center;z-index:1000;
+    <div id="add-service-modal" style="
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
+      align-items:center;justify-content:center;z-index:1000;
     ">
       <div style="
         background:var(--surface-2);border-radius:16px;padding:24px;
@@ -171,9 +171,9 @@ export async function renderCompose(container) {
     </div>
 
     <!-- Import Modal -->
-    <div id="import-modal" class="hidden" style="
-      position:fixed;inset:0;background:rgba(0,0,0,0.6);
-      display:flex;align-items:center;justify-content:center;z-index:1000;
+    <div id="import-modal" style="
+      display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);
+      align-items:center;justify-content:center;z-index:1000;
     ">
       <div style="
         background:var(--surface-2);border-radius:16px;padding:24px;
@@ -265,7 +265,7 @@ function setupTools() {
     }
   });
   document.getElementById('tool-import').addEventListener('click', () => {
-    document.getElementById('import-modal').classList.remove('hidden');
+    document.getElementById('import-modal').style.display = 'flex';
   });
   document.getElementById('yaml-copy-btn').addEventListener('click', () => {
     const yaml = generateYaml();
@@ -703,7 +703,7 @@ let addModalPos = null;
 function showAddModal(x, y) {
   addModalPos = x != null ? { x, y } : null;
   const modal = document.getElementById('add-service-modal');
-  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
   document.getElementById('add-svc-name').value = '';
   document.getElementById('add-svc-image').value = '';
   document.getElementById('add-svc-ports').value = '';
@@ -727,14 +727,14 @@ function showAddModal(x, y) {
 function setupModals() {
   // Add modal
   document.getElementById('add-cancel-btn').addEventListener('click', () => {
-    document.getElementById('add-service-modal').classList.add('hidden');
+    document.getElementById('add-service-modal').style.display = 'none';
   });
   document.getElementById('add-confirm-btn').addEventListener('click', () => {
     const name = document.getElementById('add-svc-name').value.trim() || 'service';
     const image = document.getElementById('add-svc-image').value.trim() || 'alpine:latest';
     const ports = document.getElementById('add-svc-ports').value.split('\n').map(s => s.trim()).filter(Boolean);
     const node = addNode(name, image, { ports, x: addModalPos?.x, y: addModalPos?.y });
-    document.getElementById('add-service-modal').classList.add('hidden');
+    document.getElementById('add-service-modal').style.display = 'none';
     selectNode(node.id);
   });
   document.getElementById('add-svc-name').addEventListener('keydown', (e) => {
@@ -743,19 +743,19 @@ function setupModals() {
 
   // Import modal
   document.getElementById('import-cancel-btn').addEventListener('click', () => {
-    document.getElementById('import-modal').classList.add('hidden');
+    document.getElementById('import-modal').style.display = 'none';
   });
   document.getElementById('import-confirm-btn').addEventListener('click', () => {
     const yamlText = document.getElementById('import-yaml-input').value;
     importYaml(yamlText);
-    document.getElementById('import-modal').classList.add('hidden');
+    document.getElementById('import-modal').style.display = 'none';
   });
 
   // Close modals on backdrop click
   ['add-service-modal', 'import-modal'].forEach(id => {
     document.getElementById(id).addEventListener('click', (e) => {
       if (e.target === document.getElementById(id)) {
-        document.getElementById(id).classList.add('hidden');
+        document.getElementById(id).style.display = 'none';
       }
     });
   });
