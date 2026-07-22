@@ -12,6 +12,7 @@ import { renderLogs, initSocket as initLogsSocket } from '/pages/logs.js';
 import { renderHealth } from '/pages/health.js';
 import { renderCleanup } from '/pages/cleanup.js';
 import { renderSecurity } from '/pages/security.js';
+import { renderCompose } from '/pages/compose.js';
 import api from '/api.js';
 import toast from '/toast.js';
 
@@ -91,6 +92,7 @@ const PAGE_TITLES = {
   health: 'System Health',
   cleanup: 'Disk Cleanup',
   security: 'Security Audit',
+  compose: 'Compose Builder',
 };
 
 function getCurrentPage() {
@@ -139,6 +141,7 @@ async function loadPage(page, subId = null) {
     case 'health':     await renderHealth(content); break;
     case 'cleanup':    await renderCleanup(content); break;
     case 'security':   await renderSecurity(content); break;
+    case 'compose':    await renderCompose(content); break;
     case 'terminal':
       // Terminal page needs full height, no padding
       content.style.padding = '0';

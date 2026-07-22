@@ -28,6 +28,7 @@ const networksRouter = require('./routes/networks');
 const volumesRouter = require('./routes/volumes');
 const statsRouter = require('./routes/stats');
 const securityRouter = require('./routes/security');
+const composeRouter  = require('./routes/compose');
 
 app.use('/api/containers', containersRouter);
 app.use('/api/images', imagesRouter);
@@ -35,6 +36,7 @@ app.use('/api/networks', networksRouter);
 app.use('/api/volumes', volumesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/security', securityRouter);
+app.use('/api/compose',  composeRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

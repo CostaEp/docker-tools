@@ -94,6 +94,12 @@ export const api = {
     auditAll: () => request('GET', '/api/security/audit'),
     auditOne: (id) => request('GET', `/api/security/audit/${id}`),
   },
+
+  // ── Compose Builder ──────────────────────────────────────────────
+  compose: {
+    deploy:  (yaml) => request('POST', '/api/compose/deploy', { yaml }),
+    running: ()     => request('GET',  '/api/compose/running'),
+  },
 };
 
 export default api;
