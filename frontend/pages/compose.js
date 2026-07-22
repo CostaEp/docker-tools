@@ -596,13 +596,6 @@ function selectNode(id) {
 }
 
 /* ── Connections ─────────────────────────────────────────────────────────── */
-function addConnection(fromId, toId) {
-  if (connections.find(c => c.from === fromId && c.to === toId)) return;
-  connections.push({ from: fromId, to: toId, network: 'default' });
-  renderConnections();
-  updateYaml();
-  toast('Services connected', 'success');
-}
 
 function renderConnections() {
   const g = svgEl.querySelector('#svg-connections');
