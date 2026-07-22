@@ -27,16 +27,18 @@ const imagesRouter = require('./routes/images');
 const networksRouter = require('./routes/networks');
 const volumesRouter = require('./routes/volumes');
 const statsRouter = require('./routes/stats');
+const securityRouter = require('./routes/security');
 
 app.use('/api/containers', containersRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/networks', networksRouter);
 app.use('/api/volumes', volumesRouter);
 app.use('/api/stats', statsRouter);
+app.use('/api/security', securityRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: '1.2.0', timestamp: new Date().toISOString() });
 });
 
 // Docker info

@@ -11,6 +11,7 @@ import { renderTerminal, initSocket as initTerminalSocket, openTerminalForContai
 import { renderLogs, initSocket as initLogsSocket } from '/pages/logs.js';
 import { renderHealth } from '/pages/health.js';
 import { renderCleanup } from '/pages/cleanup.js';
+import { renderSecurity } from '/pages/security.js';
 import api from '/api.js';
 import toast from '/toast.js';
 
@@ -89,6 +90,7 @@ const PAGE_TITLES = {
   logs: 'Live Logs',
   health: 'System Health',
   cleanup: 'Disk Cleanup',
+  security: 'Security Audit',
 };
 
 function getCurrentPage() {
@@ -136,6 +138,7 @@ async function loadPage(page, subId = null) {
     case 'logs':       await renderLogs(content); break;
     case 'health':     await renderHealth(content); break;
     case 'cleanup':    await renderCleanup(content); break;
+    case 'security':   await renderSecurity(content); break;
     case 'terminal':
       // Terminal page needs full height, no padding
       content.style.padding = '0';

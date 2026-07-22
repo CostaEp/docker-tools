@@ -88,6 +88,12 @@ export const api = {
     all: () => request('GET', '/api/stats'),
     one: (id) => request('GET', `/api/stats/${id}`),
   },
+
+  // ── Security Audit ───────────────────────────────────────────────
+  security: {
+    auditAll: () => request('GET', '/api/security/audit'),
+    auditOne: (id) => request('GET', `/api/security/audit/${id}`),
+  },
 };
 
 export default api;
