@@ -61,6 +61,14 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ image, tag }),
     }),
+    load: (file) => fetch(BASE + '/api/images/load', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream' },
+      body: file,
+    }).then(res => {
+      if (!res.ok) throw new Error('Image load failed');
+      return res.json();
+    }),
   },
 
   // ── Networks ────────────────────────────────────────────────────

@@ -90,4 +90,18 @@ router.post('/pull', async (req, res) => {
   }
 });
 
+// Load image tar / tar.gz stream
+router.post('/load', (req, res) => {
+  docker.loadImage(req, (err, stream) => {
+    if (err) return res.status(500).json({ error: err.message });
+    docker.modem.followProgress(
+      stream,
+      (err, output) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true, output });
+      }
+    );
+  });
+});
+
 module.exports = router;

@@ -139,18 +139,25 @@ export async function renderCompose(container) {
     ">
       <div style="
         background:var(--surface-2);border-radius:16px;padding:24px;
-        width:400px;border:1px solid rgba(255,255,255,0.1);
+        width:450px;border:1px solid rgba(255,255,255,0.1);
       ">
-        <div style="font-size:16px;font-weight:700;margin-bottom:16px;">
-          <i class="ph ph-plus-square" style="color:var(--accent-start);"></i> Add Service
+        <div style="font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;">
+          <span><i class="ph ph-plus-square" style="color:var(--accent-start);"></i> Add Service</span>
+          <label for="add-tar-file-input" class="btn btn-secondary btn-sm" style="font-size:11px;padding:3px 10px;cursor:pointer;" title="Load image from local .tar / .tar.gz archive file">
+            <i class="ph ph-upload-simple"></i> Load .tar.gz
+          </label>
+          <input type="file" id="add-tar-file-input" accept=".tar,.tar.gz,.tgz" style="display:none;" />
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label">Service Name</label>
           <input class="form-input" id="add-svc-name" placeholder="e.g. backend, db, nginx" />
         </div>
         <div class="form-group" style="margin-bottom:12px;">
-          <label class="form-label">Image</label>
-          <input class="form-input" id="add-svc-image" placeholder="e.g. nginx:latest, postgres:16" />
+          <label class="form-label">Image Tag / Select</label>
+          <select class="form-input" id="add-svc-image-select" style="margin-bottom:6px;width:100%;">
+            <option value="">Loading images...</option>
+          </select>
+          <input class="form-input" id="add-svc-image" placeholder="Or enter custom image tag..." />
         </div>
         <div class="form-group" style="margin-bottom:12px;">
           <label class="form-label">Ports (one per line, host:container)</label>
@@ -337,10 +344,30 @@ function setupCanvasEvents() {
   });
 }
 
-/* ── Node management ─────────────────────────────────────────────────────── */
+/* ── Node management & Templates ─────────────────────────────────────────── */
 const TEMPLATES = [
+  {
+    name: 'postgres',
+    image: 'postgres:16-alpine',
+    ports: ['5432:5432'],
+    env: ['POSTGRES_PASSWORD=secret', 'POSTGRES_USER=postgres', 'POSTGRES_DB=app_db'],
+    volumes: ['postgres_data:/var/lib/postgresql/data']
+  },
+  {
+    name: 'oracle-server',
+    image: 'gvenzl/oracle-free:latest',
+    ports: ['1521:1521', '8563:8563'],
+    env: ['ORACLE_PASSWORD=secret', 'APP_USER=app', 'APP_USER_PASSWORD=app_secret'],
+    volumes: ['oracle_data:/opt/oracle/oradata']
+  },
+  {
+    name: 'oracle-client',
+    image: 'oraclelinux:9-slim',
+    ports: [],
+    env: ['TNS_ADMIN=/etc/oracle'],
+    volumes: ['./tnsnames.ora:/etc/oracle/tnsnames.ora:ro']
+  },
   { name: 'nginx',       image: 'nginx:latest',      ports: ['80:80','443:443'] },
-  { name: 'postgres',    image: 'postgres:16',        ports: ['5432:5432'], env: ['POSTGRES_PASSWORD=secret'] },
   { name: 'redis',       image: 'redis:alpine',       ports: ['6379:6379'] },
   { name: 'mysql',       image: 'mysql:8',            ports: ['3306:3306'], env: ['MYSQL_ROOT_PASSWORD=secret'] },
   { name: 'mongo',       image: 'mongo:7',            ports: ['27017:27017'] },
@@ -348,6 +375,82 @@ const TEMPLATES = [
   { name: 'backend',     image: 'node:20-alpine',     ports: ['3000:3000'] },
   { name: 'frontend',    image: 'nginx:alpine',       ports: ['80:80'] },
 ];
+
+async function populateImageSelect(selectEl, currentVal = '') {
+  if (!selectEl) return;
+  
+  let localImages = [];
+  try {
+    const raw = await api.images.list();
+    localImages = raw.flatMap(img => img.RepoTags || []).filter(t => t && t !== '<none>:<none>');
+  } catch (err) {
+    console.warn('Could not fetch local images:', err);
+  }
+
+  const defaultImages = [
+    'postgres:16-alpine',
+    'gvenzl/oracle-free:latest',
+    'oraclelinux:9-slim',
+    'nginx:latest',
+    'redis:alpine',
+    'mysql:8',
+    'mongo:7',
+    'adminer:latest',
+    'node:20-alpine'
+  ];
+
+  let html = '<option value="__custom__">-- Custom / Manual Image Tag --</option>';
+  if (localImages.length) {
+    html += `<optgroup label="Local Docker Host Images (${localImages.length})">`;
+    localImages.forEach(img => {
+      const selected = img === currentVal ? 'selected' : '';
+      html += `<option value="${img}" ${selected}>${img}</option>`;
+    });
+    html += `</optgroup>`;
+  }
+
+  html += `<optgroup label="Template / Standard Images">`;
+  defaultImages.forEach(img => {
+    if (!localImages.includes(img)) {
+      const selected = img === currentVal ? 'selected' : '';
+      html += `<option value="${img}" ${selected}>${img}</option>`;
+    }
+  });
+  html += `</optgroup>`;
+
+  selectEl.innerHTML = html;
+  if (currentVal && Array.from(selectEl.options).some(o => o.value === currentVal)) {
+    selectEl.value = currentVal;
+  } else if (currentVal) {
+    selectEl.value = '__custom__';
+  }
+}
+
+async function handleTarUpload(fileInput, targetInput, selectEl) {
+  const file = fileInput.files && fileInput.files[0];
+  if (!file) return;
+
+  toast(`Loading ${file.name} into Docker... Please wait`, 'info');
+  try {
+    await api.images.load(file);
+    toast(`Successfully loaded image from ${file.name}`, 'success');
+    
+    // Refresh images list & select dropdown
+    await populateImageSelect(selectEl);
+    
+    const localRaw = await api.images.list();
+    const newest = localRaw[0]?.RepoTags?.[0];
+    if (newest && newest !== '<none>:<none>') {
+      targetInput.value = newest;
+      selectEl.value = newest;
+      targetInput.dispatchEvent(new Event('input'));
+    }
+  } catch (err) {
+    toast(`Failed to load image archive: ${err.message}`, 'error');
+  } finally {
+    fileInput.value = '';
+  }
+}
 
 function addNode(name, image, opts = {}) {
   const usedColors = nodes.map(n => n.color);
@@ -530,7 +633,16 @@ function updatePanel() {
       <input class="form-input" id="prop-name" value="${node.name}" />
     </div>
     <div class="form-group">
-      <label class="form-label">Image</label>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <label class="form-label" style="margin:0;">Image</label>
+        <label for="prop-tar-file-input" class="btn btn-secondary btn-sm" style="font-size:10px;padding:2px 6px;cursor:pointer;" title="Load image from local .tar / .tar.gz archive file">
+          <i class="ph ph-upload-simple"></i> Load .tar.gz
+        </label>
+        <input type="file" id="prop-tar-file-input" accept=".tar,.tar.gz,.tgz" style="display:none;" />
+      </div>
+      <select class="form-input" id="prop-image-select" style="width:100%;margin-bottom:4px;">
+        <option value="">Loading images...</option>
+      </select>
       <input class="form-input" id="prop-image" value="${node.image}" />
     </div>
     <div class="form-group">
@@ -586,6 +698,25 @@ function updatePanel() {
       <i class="ph ph-trash"></i> Delete Service
     </button>
   `;
+
+  // Populate image select
+  const propImgSelect = document.getElementById('prop-image-select');
+  const propImgInput = document.getElementById('prop-image');
+  populateImageSelect(propImgSelect, node.image);
+
+  propImgSelect?.addEventListener('change', () => {
+    if (propImgSelect.value !== '__custom__') {
+      propImgInput.value = propImgSelect.value;
+      node.image = propImgSelect.value;
+      renderNode(node);
+      updateYaml();
+    }
+  });
+
+  const propTarInput = document.getElementById('prop-tar-file-input');
+  propTarInput?.addEventListener('change', () => {
+    handleTarUpload(propTarInput, propImgInput, propImgSelect);
+  });
 
   // Wire up live-update inputs
   const wireInput = (id, field) => {
@@ -700,8 +831,11 @@ function updateYaml() {
 
 /* ── Modals ──────────────────────────────────────────────────────────────── */
 let addModalPos = null;
+let selectedTmpl = null;
+
 function showAddModal(x, y) {
   addModalPos = x != null ? { x, y } : null;
+  selectedTmpl = null;
   const modal = document.getElementById('add-service-modal');
   modal.style.display = 'flex';
   document.getElementById('add-svc-name').value = '';
@@ -709,22 +843,45 @@ function showAddModal(x, y) {
   document.getElementById('add-svc-ports').value = '';
   document.getElementById('add-svc-name').focus();
 
+  const selectEl = document.getElementById('add-svc-image-select');
+  const imgInput = document.getElementById('add-svc-image');
+  populateImageSelect(selectEl, '');
+
+  selectEl?.addEventListener('change', () => {
+    if (selectEl.value !== '__custom__') {
+      imgInput.value = selectEl.value;
+    }
+  });
+
   const tmplEl = document.getElementById('template-btns');
   tmplEl.innerHTML = TEMPLATES.map(t => `
-    <button class="btn btn-secondary btn-sm tmpl-btn" data-name="${t.name}" data-image="${t.image}" data-ports="${(t.ports||[]).join(',')}" data-env="${(t.env||[]).join(',')}" style="font-size:11px;">
+    <button class="btn btn-secondary btn-sm tmpl-btn" data-name="${t.name}" style="font-size:11px;">
       ${t.name}
     </button>
   `).join('');
   tmplEl.querySelectorAll('.tmpl-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.getElementById('add-svc-name').value = btn.dataset.name;
-      document.getElementById('add-svc-image').value = btn.dataset.image;
-      document.getElementById('add-svc-ports').value = (btn.dataset.ports || '').split(',').filter(Boolean).join('\n');
+      const tmpl = TEMPLATES.find(t => t.name === btn.dataset.name);
+      if (tmpl) {
+        selectedTmpl = tmpl;
+        document.getElementById('add-svc-name').value = tmpl.name;
+        imgInput.value = tmpl.image;
+        if (selectEl) selectEl.value = tmpl.image;
+        document.getElementById('add-svc-ports').value = (tmpl.ports || []).join('\n');
+      }
     });
   });
 }
 
 function setupModals() {
+  // Tar upload handler for Add Modal
+  const addTarInput = document.getElementById('add-tar-file-input');
+  addTarInput?.addEventListener('change', () => {
+    const targetInput = document.getElementById('add-svc-image');
+    const selectEl = document.getElementById('add-svc-image-select');
+    handleTarUpload(addTarInput, targetInput, selectEl);
+  });
+
   // Add modal
   document.getElementById('add-cancel-btn').addEventListener('click', () => {
     document.getElementById('add-service-modal').style.display = 'none';
@@ -733,7 +890,11 @@ function setupModals() {
     const name = document.getElementById('add-svc-name').value.trim() || 'service';
     const image = document.getElementById('add-svc-image').value.trim() || 'alpine:latest';
     const ports = document.getElementById('add-svc-ports').value.split('\n').map(s => s.trim()).filter(Boolean);
-    const node = addNode(name, image, { ports, x: addModalPos?.x, y: addModalPos?.y });
+
+    const env = selectedTmpl && selectedTmpl.name === name ? [...(selectedTmpl.env || [])] : [];
+    const volumes = selectedTmpl && selectedTmpl.name === name ? [...(selectedTmpl.volumes || [])] : [];
+
+    const node = addNode(name, image, { ports, env, volumes, x: addModalPos?.x, y: addModalPos?.y });
     document.getElementById('add-service-modal').style.display = 'none';
     selectNode(node.id);
   });
