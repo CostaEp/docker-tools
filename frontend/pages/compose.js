@@ -452,6 +452,25 @@ async function handleTarUpload(fileInput, targetInput, selectEl) {
   }
 }
 
+function addConnection(fromId, toId) {
+  if (connections.find(c => c.from === fromId && c.to === toId)) return;
+  connections.push({ from: fromId, to: toId, network: 'default' });
+
+  const fromNode = nodes.find(n => n.id === fromId);
+  const toNode   = nodes.find(n => n.id === toId);
+  if (fromNode && toNode) {
+    if (!fromNode.depends_on) fromNode.depends_on = [];
+    if (!fromNode.depends_on.includes(toNode.name)) {
+      fromNode.depends_on.push(toNode.name);
+    }
+  }
+
+  renderConnections();
+  updateYaml();
+  if (selectedId === fromId) updatePanel();
+  toast(`Connected ${fromNode?.name || 'service'} → depends on ${toNode?.name || 'service'}`, 'success');
+}
+
 function addNode(name, image, opts = {}) {
   const usedColors = nodes.map(n => n.color);
   const color = COLORS.find(c => !usedColors.includes(c)) || COLORS[nodes.length % COLORS.length];
@@ -461,10 +480,22 @@ function addNode(name, image, opts = {}) {
     id: nextId++,
     name: name || `service${nextId}`,
     image: image || 'alpine:latest',
-    ports: opts.ports || [],
-    volumes: opts.volumes || [],
-    env: opts.env || [],
-    networks: opts.networks || ['default'],
+    ports: opts.ports ? [...opts.ports] : [],
+    volumes: opts.volumes ? [...opts.volumes] : [],
+    env: opts.env ? [...opts.env] : [],
+    env_file: opts.env_file ? [...opts.env_file] : [],
+    depends_on: opts.depends_on ? [...opts.depends_on] : [],
+    healthcheck: opts.healthcheck ? { ...opts.healthcheck } : { test: '', interval: '10s', timeout: '5s', retries: 3, start_period: '0s' },
+    secrets: opts.secrets ? [...opts.secrets] : [],
+    command: opts.command || '',
+    entrypoint: opts.entrypoint || '',
+    user: opts.user || '',
+    working_dir: opts.working_dir || '',
+    privileged: opts.privileged || false,
+    mem_limit: opts.mem_limit || '',
+    cpus: opts.cpus || '',
+    extra_hosts: opts.extra_hosts ? [...opts.extra_hosts] : [],
+    networks: opts.networks ? [...opts.networks] : ['default'],
     restart: opts.restart || 'unless-stopped',
     color,
     x, y,
@@ -622,16 +653,20 @@ function updatePanel() {
     return;
   }
 
+  const otherNodes = nodes.filter(n => n.id !== node.id);
+
   panelEl.innerHTML = `
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;">
       <div style="width:12px;height:12px;border-radius:50%;background:${node.color};flex-shrink:0;"></div>
       <div style="font-weight:700;font-size:14px;color:var(--text-primary);">${node.name}</div>
     </div>
 
+    <!-- Basic Config -->
     <div class="form-group">
       <label class="form-label">Service Name</label>
       <input class="form-input" id="prop-name" value="${node.name}" />
     </div>
+
     <div class="form-group">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
         <label class="form-label" style="margin:0;">Image</label>
@@ -645,6 +680,7 @@ function updatePanel() {
       </select>
       <input class="form-input" id="prop-image" value="${node.image}" />
     </div>
+
     <div class="form-group">
       <label class="form-label">Restart Policy</label>
       <select class="form-input" id="prop-restart" style="width:100%;">
@@ -654,10 +690,22 @@ function updatePanel() {
       </select>
     </div>
 
+    <!-- Dependencies (depends_on) -->
+    <div class="form-group">
+      <label class="form-label">Dependencies (depends_on)</label>
+      <div id="prop-depends">
+        ${(node.depends_on || []).map((dep, i) => depRow(dep, i, otherNodes)).join('')}
+      </div>
+      <button class="btn btn-secondary btn-sm" id="add-dep-btn" style="margin-top:4px;width:100%;">
+        <i class="ph ph-plus"></i> Add Dependency
+      </button>
+    </div>
+
+    <!-- Ports & Volumes -->
     <div class="form-group">
       <label class="form-label">Ports (host:container)</label>
       <div id="prop-ports">
-        ${node.ports.map((p, i) => portRow(p, i)).join('')}
+        ${(node.ports || []).map((p, i) => portRow(p, i)).join('')}
       </div>
       <button class="btn btn-secondary btn-sm" id="add-port-btn" style="margin-top:4px;width:100%;">
         <i class="ph ph-plus"></i> Add Port
@@ -667,17 +715,18 @@ function updatePanel() {
     <div class="form-group">
       <label class="form-label">Volumes (host:container)</label>
       <div id="prop-volumes">
-        ${node.volumes.map((v, i) => volRow(v, i)).join('')}
+        ${(node.volumes || []).map((v, i) => volRow(v, i)).join('')}
       </div>
       <button class="btn btn-secondary btn-sm" id="add-vol-btn" style="margin-top:4px;width:100%;">
         <i class="ph ph-plus"></i> Add Volume
       </button>
     </div>
 
+    <!-- Environment & Secrets -->
     <div class="form-group">
-      <label class="form-label">Environment Variables</label>
+      <label class="form-label">Environment Variables (KEY=value)</label>
       <div id="prop-env">
-        ${node.env.map((e, i) => envRow(e, i)).join('')}
+        ${(node.env || []).map((e, i) => envRow(e, i)).join('')}
       </div>
       <button class="btn btn-secondary btn-sm" id="add-env-btn" style="margin-top:4px;width:100%;">
         <i class="ph ph-plus"></i> Add Variable
@@ -685,16 +734,112 @@ function updatePanel() {
     </div>
 
     <div class="form-group">
+      <label class="form-label">Environment Files (env_file)</label>
+      <div id="prop-envfile">
+        ${(node.env_file || []).map((ef, i) => envFileRow(ef, i)).join('')}
+      </div>
+      <button class="btn btn-secondary btn-sm" id="add-envfile-btn" style="margin-top:4px;width:100%;">
+        <i class="ph ph-plus"></i> Add env_file
+      </button>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Secrets</label>
+      <div id="prop-secrets">
+        ${(node.secrets || []).map((s, i) => secretRow(s, i)).join('')}
+      </div>
+      <button class="btn btn-secondary btn-sm" id="add-secret-btn" style="margin-top:4px;width:100%;">
+        <i class="ph ph-plus"></i> Add Secret
+      </button>
+    </div>
+
+    <!-- Healthcheck (בדיקת חיות) -->
+    <div style="border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;padding-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">
+        <i class="ph ph-heartbeat" style="color:#2ed573;"></i> Healthcheck (בדיקת חיות)
+      </div>
+      <div class="form-group">
+        <label class="form-label">Test Command</label>
+        <input class="form-input" id="prop-hc-test" value="${node.healthcheck?.test || ''}" placeholder="e.g. pg_isready or curl -f http://localhost/" />
+      </div>
+      <div style="display:flex;gap:6px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Interval</label>
+          <input class="form-input" id="prop-hc-interval" value="${node.healthcheck?.interval || '10s'}" placeholder="10s" />
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Timeout</label>
+          <input class="form-input" id="prop-hc-timeout" value="${node.healthcheck?.timeout || '5s'}" placeholder="5s" />
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Retries</label>
+          <input class="form-input" type="number" id="prop-hc-retries" value="${node.healthcheck?.retries ?? 3}" />
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Start Period</label>
+          <input class="form-input" id="prop-hc-startperiod" value="${node.healthcheck?.start_period || '0s'}" placeholder="0s" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Advanced Settings (Command, User, Limits, Privileged) -->
+    <div style="border-top:1px solid rgba(255,255,255,0.06);margin:12px 0;padding-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">
+        <i class="ph ph-gear" style="color:var(--accent-start);"></i> Advanced Config
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Command Override</label>
+        <input class="form-input" id="prop-command" value="${node.command || ''}" placeholder="e.g. python app.py" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Entrypoint Override</label>
+        <input class="form-input" id="prop-entrypoint" value="${node.entrypoint || ''}" placeholder="e.g. /entrypoint.sh" />
+      </div>
+
+      <div style="display:flex;gap:6px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">User</label>
+          <input class="form-input" id="prop-user" value="${node.user || ''}" placeholder="1000:1000" />
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Working Dir</label>
+          <input class="form-input" id="prop-workingdir" value="${node.working_dir || ''}" placeholder="/app" />
+        </div>
+      </div>
+
+      <div style="display:flex;gap:6px;">
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">Memory Limit</label>
+          <input class="form-input" id="prop-memlimit" value="${node.mem_limit || ''}" placeholder="512m or 2g" />
+        </div>
+        <div class="form-group" style="flex:1;">
+          <label class="form-label">CPU Limit</label>
+          <input class="form-input" id="prop-cpus" value="${node.cpus || ''}" placeholder="1.0 or 0.5" />
+        </div>
+      </div>
+
+      <div class="form-group" style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+        <input type="checkbox" id="prop-privileged" ${node.privileged ? 'checked' : ''} style="width:16px;height:16px;cursor:pointer;" />
+        <label for="prop-privileged" style="font-size:12px;color:var(--text-secondary);cursor:pointer;user-select:none;">Privileged Mode (--privileged)</label>
+      </div>
+    </div>
+
+    <!-- Networks -->
+    <div class="form-group">
       <label class="form-label">Networks</label>
       <div id="prop-networks">
-        ${node.networks.map((n2, i) => netRow(n2, i)).join('')}
+        ${(node.networks || []).map((n2, i) => netRow(n2, i)).join('')}
       </div>
       <button class="btn btn-secondary btn-sm" id="add-net-btn" style="margin-top:4px;width:100%;">
         <i class="ph ph-plus"></i> Add Network
       </button>
     </div>
 
-    <button class="btn btn-secondary btn-sm" id="delete-node-btn" style="width:100%;margin-top:8px;color:#ff4757;">
+    <button class="btn btn-secondary btn-sm" id="delete-node-btn" style="width:100%;margin-top:16px;color:#ff4757;">
       <i class="ph ph-trash"></i> Delete Service
     </button>
   `;
@@ -729,32 +874,55 @@ function updatePanel() {
   };
   wireInput('prop-name', 'name');
   wireInput('prop-image', 'image');
+  wireInput('prop-command', 'command');
+  wireInput('prop-entrypoint', 'entrypoint');
+  wireInput('prop-user', 'user');
+  wireInput('prop-workingdir', 'working_dir');
+  wireInput('prop-memlimit', 'mem_limit');
+  wireInput('prop-cpus', 'cpus');
+
+  // Privileged toggle
+  document.getElementById('prop-privileged')?.addEventListener('change', (e) => {
+    node.privileged = e.target.checked;
+    updateYaml();
+  });
+
+  // Healthcheck inputs
+  const wireHc = (id, field) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      if (!node.healthcheck) node.healthcheck = {};
+      node.healthcheck[field] = el.value;
+      updateYaml();
+    });
+  };
+  wireHc('prop-hc-test', 'test');
+  wireHc('prop-hc-interval', 'interval');
+  wireHc('prop-hc-timeout', 'timeout');
+  wireHc('prop-hc-retries', 'retries');
+  wireHc('prop-hc-startperiod', 'start_period');
 
   document.getElementById('prop-restart')?.addEventListener('change', (e) => {
     node.restart = e.target.value; updateYaml();
   });
 
-  document.getElementById('add-port-btn')?.addEventListener('click', () => {
-    node.ports.push(''); updatePanel(); updateYaml();
-    document.getElementById('prop-ports')?.lastElementChild?.querySelector('input')?.focus();
-  });
-  document.getElementById('add-vol-btn')?.addEventListener('click', () => {
-    node.volumes.push(''); updatePanel(); updateYaml();
-  });
-  document.getElementById('add-env-btn')?.addEventListener('click', () => {
-    node.env.push(''); updatePanel(); updateYaml();
-  });
-  document.getElementById('add-net-btn')?.addEventListener('click', () => {
-    node.networks.push(''); updatePanel(); updateYaml();
-  });
-  document.getElementById('delete-node-btn')?.addEventListener('click', () => {
-    deleteNode(node.id);
-  });
+  // Dynamic add buttons
+  document.getElementById('add-port-btn')?.addEventListener('click', () => { if (!node.ports) node.ports = []; node.ports.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-vol-btn')?.addEventListener('click', () => { if (!node.volumes) node.volumes = []; node.volumes.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-env-btn')?.addEventListener('click', () => { if (!node.env) node.env = []; node.env.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-envfile-btn')?.addEventListener('click', () => { if (!node.env_file) node.env_file = []; node.env_file.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-dep-btn')?.addEventListener('click', () => { if (!node.depends_on) node.depends_on = []; node.depends_on.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-secret-btn')?.addEventListener('click', () => { if (!node.secrets) node.secrets = []; node.secrets.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('add-net-btn')?.addEventListener('click', () => { if (!node.networks) node.networks = []; node.networks.push(''); updatePanel(); updateYaml(); });
+  document.getElementById('delete-node-btn')?.addEventListener('click', () => { deleteNode(node.id); });
 
   // Wire dynamic rows
   wireRows('prop-ports', node, 'ports');
   wireRows('prop-volumes', node, 'volumes');
   wireRows('prop-env', node, 'env');
+  wireRows('prop-envfile', node, 'env_file');
+  wireRows('prop-depends', node, 'depends_on');
+  wireRows('prop-secrets', node, 'secrets');
   wireRows('prop-networks', node, 'networks');
 }
 
@@ -767,6 +935,22 @@ function volRow(val, i) {
 function envRow(val, i) {
   return `<div class="prop-row"><input class="form-input row-input" data-idx="${i}" value="${val}" placeholder="KEY=value"/><button class="btn btn-secondary btn-sm row-del" data-idx="${i}" style="width:30px;padding:0;color:#ff4757;">✕</button></div>`;
 }
+function envFileRow(val, i) {
+  return `<div class="prop-row"><input class="form-input row-input" data-idx="${i}" value="${val}" placeholder=".env or ./db.env"/><button class="btn btn-secondary btn-sm row-del" data-idx="${i}" style="width:30px;padding:0;color:#ff4757;">✕</button></div>`;
+}
+function secretRow(val, i) {
+  return `<div class="prop-row"><input class="form-input row-input" data-idx="${i}" value="${val}" placeholder="db_password"/><button class="btn btn-secondary btn-sm row-del" data-idx="${i}" style="width:30px;padding:0;color:#ff4757;">✕</button></div>`;
+}
+function depRow(val, i, otherNodes) {
+  const options = otherNodes.map(n => `<option value="${n.name}" ${n.name === val ? 'selected' : ''}>${n.name}</option>`).join('');
+  return `<div class="prop-row">
+    <select class="form-input row-input" data-idx="${i}" style="flex:1;">
+      <option value="">Select Service...</option>
+      ${options}
+    </select>
+    <button class="btn btn-secondary btn-sm row-del" data-idx="${i}" style="width:30px;padding:0;color:#ff4757;">✕</button>
+  </div>`;
+}
 function netRow(val, i) {
   return `<div class="prop-row"><input class="form-input row-input" data-idx="${i}" value="${val}" placeholder="default"/><button class="btn btn-secondary btn-sm row-del" data-idx="${i}" style="width:30px;padding:0;color:#ff4757;">✕</button></div>`;
 }
@@ -776,13 +960,19 @@ function wireRows(containerId, node, field) {
   if (!container) return;
   container.querySelectorAll('.row-input').forEach(input => {
     input.addEventListener('input', () => {
+      if (!node[field]) node[field] = [];
+      node[field][parseInt(input.dataset.idx)] = input.value;
+      renderNode(node); updateYaml();
+    });
+    input.addEventListener('change', () => {
+      if (!node[field]) node[field] = [];
       node[field][parseInt(input.dataset.idx)] = input.value;
       renderNode(node); updateYaml();
     });
   });
   container.querySelectorAll('.row-del').forEach(btn => {
     btn.addEventListener('click', () => {
-      node[field].splice(parseInt(btn.dataset.idx), 1);
+      if (node[field]) node[field].splice(parseInt(btn.dataset.idx), 1);
       updatePanel(); renderNode(node); updateYaml();
     });
   });
@@ -792,26 +982,88 @@ function wireRows(containerId, node, field) {
 function generateYaml() {
   if (!nodes.length) return '# Add services to generate compose YAML';
 
-  const allNetworks = [...new Set(nodes.flatMap(n => n.networks).filter(Boolean))];
+  const allNetworks = [...new Set(nodes.flatMap(n => n.networks || []).filter(Boolean))];
+  const allSecrets  = [...new Set(nodes.flatMap(n => n.secrets || []).filter(Boolean))];
 
   let yaml = 'services:\n';
   for (const node of nodes) {
     yaml += `\n  ${node.name}:\n`;
     yaml += `    image: ${node.image}\n`;
     if (node.restart && node.restart !== 'no') yaml += `    restart: ${node.restart}\n`;
-    if (node.ports.length) {
+    if (node.command) yaml += `    command: ${node.command}\n`;
+    if (node.entrypoint) yaml += `    entrypoint: ${node.entrypoint}\n`;
+    if (node.user) yaml += `    user: "${node.user}"\n`;
+    if (node.working_dir) yaml += `    working_dir: ${node.working_dir}\n`;
+    if (node.privileged) yaml += `    privileged: true\n`;
+
+    // Ports
+    if (node.ports && node.ports.filter(Boolean).length) {
       yaml += `    ports:\n`;
       node.ports.filter(Boolean).forEach(p => { yaml += `      - "${p}"\n`; });
     }
-    if (node.volumes.length) {
+
+    // Volumes
+    if (node.volumes && node.volumes.filter(Boolean).length) {
       yaml += `    volumes:\n`;
       node.volumes.filter(Boolean).forEach(v => { yaml += `      - ${v}\n`; });
     }
-    if (node.env.length) {
+
+    // Environment
+    if (node.env && node.env.filter(Boolean).length) {
       yaml += `    environment:\n`;
       node.env.filter(Boolean).forEach(e => { yaml += `      - ${e}\n`; });
     }
-    if (node.networks.filter(Boolean).length) {
+
+    // Env File
+    if (node.env_file && node.env_file.filter(Boolean).length) {
+      yaml += `    env_file:\n`;
+      node.env_file.filter(Boolean).forEach(ef => { yaml += `      - ${ef}\n`; });
+    }
+
+    // Depends_on
+    if (node.depends_on && node.depends_on.filter(Boolean).length) {
+      yaml += `    depends_on:\n`;
+      node.depends_on.filter(Boolean).forEach(dep => { yaml += `      - ${dep}\n`; });
+    }
+
+    // Healthcheck
+    if (node.healthcheck && node.healthcheck.test) {
+      yaml += `    healthcheck:\n`;
+      const t = node.healthcheck.test;
+      if (t.startsWith('CMD')) {
+        yaml += `      test: ${t}\n`;
+      } else {
+        yaml += `      test: ["CMD-SHELL", "${t}"]\n`;
+      }
+      if (node.healthcheck.interval) yaml += `      interval: ${node.healthcheck.interval}\n`;
+      if (node.healthcheck.timeout) yaml += `      timeout: ${node.healthcheck.timeout}\n`;
+      if (node.healthcheck.retries) yaml += `      retries: ${node.healthcheck.retries}\n`;
+      if (node.healthcheck.start_period) yaml += `      start_period: ${node.healthcheck.start_period}\n`;
+    }
+
+    // Secrets
+    if (node.secrets && node.secrets.filter(Boolean).length) {
+      yaml += `    secrets:\n`;
+      node.secrets.filter(Boolean).forEach(s => { yaml += `      - ${s}\n`; });
+    }
+
+    // Extra hosts
+    if (node.extra_hosts && node.extra_hosts.filter(Boolean).length) {
+      yaml += `    extra_hosts:\n`;
+      node.extra_hosts.filter(Boolean).forEach(h => { yaml += `      - "${h}"\n`; });
+    }
+
+    // Resource limits
+    if (node.mem_limit || node.cpus) {
+      yaml += `    deploy:\n`;
+      yaml += `      resources:\n`;
+      yaml += `        limits:\n`;
+      if (node.cpus) yaml += `          cpus: '${node.cpus}'\n`;
+      if (node.mem_limit) yaml += `          memory: ${node.mem_limit}\n`;
+    }
+
+    // Networks
+    if (node.networks && node.networks.filter(Boolean).length) {
       yaml += `    networks:\n`;
       node.networks.filter(Boolean).forEach(n => { yaml += `      - ${n}\n`; });
     }
@@ -821,6 +1073,12 @@ function generateYaml() {
     yaml += '\nnetworks:\n';
     allNetworks.forEach(n => { yaml += `  ${n}:\n`; });
   }
+
+  if (allSecrets.length) {
+    yaml += '\nsecrets:\n';
+    allSecrets.forEach(s => { yaml += `  ${s}:\n    file: ./${s}.txt\n`; });
+  }
+
   return yaml;
 }
 

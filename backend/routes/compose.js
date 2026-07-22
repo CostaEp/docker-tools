@@ -35,15 +35,35 @@ router.post('/deploy', async (req, res) => {
           name: svc.name,
           Image: svc.image,
           Env: svc.env || [],
+          Cmd: svc.command ? svc.command.split(' ') : undefined,
+          User: svc.user || undefined,
+          WorkingDir: svc.working_dir || undefined,
           Labels: { 'com.dockerforge.managed': 'true', 'com.docker.compose.service': svc.name },
           HostConfig: {
             Binds: svc.volumes || [],
             PortBindings: buildPortBindings(svc.ports || []),
             RestartPolicy: { Name: svc.restart || 'unless-stopped' },
             NetworkMode: (svc.networks && svc.networks[0]) || 'bridge',
+            Privileged: svc.privileged === true,
+            Memory: svc.mem_limit ? parseMemoryBytes(svc.mem_limit) : 0,
+            NanoCpus: svc.cpus ? Math.floor(parseFloat(svc.cpus) * 1e9) : 0,
+            ExtraHosts: svc.extra_hosts || [],
           },
           ExposedPorts: buildExposedPorts(svc.ports || []),
         };
+
+        if (svc.healthcheck && svc.healthcheck.test) {
+          const testCmd = svc.healthcheck.test.startsWith('CMD')
+            ? svc.healthcheck.test.split(' ')
+            : ['CMD-SHELL', svc.healthcheck.test];
+          createOptions.Healthcheck = {
+            Test: testCmd,
+            Interval: parseDurationNs(svc.healthcheck.interval || '10s'),
+            Timeout: parseDurationNs(svc.healthcheck.timeout || '5s'),
+            Retries: parseInt(svc.healthcheck.retries || 3),
+            StartPeriod: parseDurationNs(svc.healthcheck.start_period || '0s'),
+          };
+        }
 
         const container = await docker.createContainer(createOptions);
         await container.start();
@@ -87,22 +107,35 @@ function parseComposeServices(text) {
   const services = [];
   let current = null;
   let inServices = false;
-  let inPorts = false, inVolumes = false, inEnv = false, inNetworks = false;
+  let currentArrayKey = null;
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
     if (trimmed === 'services:') { inServices = true; continue; }
-    if (trimmed === 'networks:' || trimmed === 'volumes:') { inServices = false; continue; }
+    if (trimmed === 'networks:' || trimmed === 'volumes:' || trimmed === 'secrets:') { inServices = false; continue; }
     if (!inServices) continue;
 
-    // Top-level service name (2 space indent)
+    // Service name (2 space indent)
     const svcMatch = line.match(/^  ([a-zA-Z0-9_-]+):\s*$/);
     if (svcMatch) {
-      current = { name: svcMatch[1], image: 'alpine:latest', ports: [], volumes: [], env: [], networks: [], restart: 'unless-stopped' };
+      current = {
+        name: svcMatch[1],
+        image: 'alpine:latest',
+        ports: [],
+        volumes: [],
+        env: [],
+        env_file: [],
+        depends_on: [],
+        secrets: [],
+        extra_hosts: [],
+        networks: [],
+        restart: 'unless-stopped',
+        healthcheck: {},
+      };
       services.push(current);
-      inPorts = inVolumes = inEnv = inNetworks = false;
+      currentArrayKey = null;
       continue;
     }
 
@@ -110,16 +143,37 @@ function parseComposeServices(text) {
 
     if (line.match(/^    image:/)) { current.image = trimmed.replace('image:', '').trim().replace(/^["']|["']$/g, ''); }
     else if (line.match(/^    restart:/)) { current.restart = trimmed.replace('restart:', '').trim(); }
-    else if (trimmed === 'ports:') { inPorts = true; inVolumes = inEnv = inNetworks = false; }
-    else if (trimmed === 'volumes:') { inVolumes = true; inPorts = inEnv = inNetworks = false; }
-    else if (trimmed === 'environment:') { inEnv = true; inPorts = inVolumes = inNetworks = false; }
-    else if (trimmed === 'networks:') { inNetworks = true; inPorts = inVolumes = inEnv = false; }
-    else if (trimmed.startsWith('- ') && line.startsWith('      ')) {
+    else if (line.match(/^    command:/)) { current.command = trimmed.replace('command:', '').trim().replace(/^["']|["']$/g, ''); }
+    else if (line.match(/^    entrypoint:/)) { current.entrypoint = trimmed.replace('entrypoint:', '').trim().replace(/^["']|["']$/g, ''); }
+    else if (line.match(/^    user:/)) { current.user = trimmed.replace('user:', '').trim().replace(/^["']|["']$/g, ''); }
+    else if (line.match(/^    working_dir:/)) { current.working_dir = trimmed.replace('working_dir:', '').trim().replace(/^["']|["']$/g, ''); }
+    else if (line.match(/^    privileged:\s*true/)) { current.privileged = true; }
+    else if (line.match(/^          memory:/)) { current.mem_limit = trimmed.replace('memory:', '').trim(); }
+    else if (line.match(/^          cpus:/)) { current.cpus = trimmed.replace('cpus:', '').trim().replace(/^["']|["']$/g, ''); }
+    else if (trimmed === 'ports:') { currentArrayKey = 'ports'; }
+    else if (trimmed === 'volumes:') { currentArrayKey = 'volumes'; }
+    else if (trimmed === 'environment:') { currentArrayKey = 'env'; }
+    else if (trimmed === 'env_file:') { currentArrayKey = 'env_file'; }
+    else if (trimmed === 'depends_on:') { currentArrayKey = 'depends_on'; }
+    else if (trimmed === 'secrets:') { currentArrayKey = 'secrets'; }
+    else if (trimmed === 'extra_hosts:') { currentArrayKey = 'extra_hosts'; }
+    else if (trimmed === 'networks:') { currentArrayKey = 'networks'; }
+    else if (line.match(/^    healthcheck:/)) { currentArrayKey = 'healthcheck'; }
+    else if (currentArrayKey === 'healthcheck' && line.match(/^      test:/)) {
+      current.healthcheck.test = trimmed.replace('test:', '').trim().replace(/^\[|\]$/g, '').replace(/^"CMD-SHELL",\s*/, '').replace(/^["']|["']$/g, '');
+    }
+    else if (currentArrayKey === 'healthcheck' && line.match(/^      interval:/)) {
+      current.healthcheck.interval = trimmed.replace('interval:', '').trim();
+    }
+    else if (currentArrayKey === 'healthcheck' && line.match(/^      timeout:/)) {
+      current.healthcheck.timeout = trimmed.replace('timeout:', '').trim();
+    }
+    else if (currentArrayKey === 'healthcheck' && line.match(/^      retries:/)) {
+      current.healthcheck.retries = parseInt(trimmed.replace('retries:', '').trim());
+    }
+    else if (trimmed.startsWith('- ') && line.startsWith('      ') && currentArrayKey && Array.isArray(current[currentArrayKey])) {
       const val = trimmed.slice(2).replace(/^["']|["']$/g, '');
-      if (inPorts) current.ports.push(val);
-      else if (inVolumes) current.volumes.push(val);
-      else if (inEnv) current.env.push(val);
-      else if (inNetworks) current.networks.push(val);
+      current[currentArrayKey].push(val);
     }
   }
   return services;
@@ -142,6 +196,30 @@ function buildExposedPorts(ports) {
     exposed[`${container}/tcp`] = {};
   }
   return exposed;
+}
+
+function parseMemoryBytes(str) {
+  if (!str) return 0;
+  const match = str.match(/^(\d+)([kmgKMG]?)$/);
+  if (!match) return 0;
+  const val = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+  if (unit === 'k') return val * 1024;
+  if (unit === 'm') return val * 1024 * 1024;
+  if (unit === 'g') return val * 1024 * 1024 * 1024;
+  return val;
+}
+
+function parseDurationNs(str) {
+  if (!str) return 0;
+  const match = str.match(/^(\d+)([smhSMH]?)$/);
+  if (!match) return 0;
+  const val = parseInt(match[1]);
+  const unit = match[2].toLowerCase();
+  let ms = val * 1000;
+  if (unit === 'm') ms = val * 60 * 1000;
+  if (unit === 'h') ms = val * 3600 * 1000;
+  return ms * 1000000;
 }
 
 module.exports = router;
