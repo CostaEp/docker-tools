@@ -1,4 +1,4 @@
-FROM node:20-alpine
+FROM --platform=linux/amd64 node:20-alpine
 
 # Install system dependencies for node-pty and docker CLI tools
 RUN apk add --no-cache \

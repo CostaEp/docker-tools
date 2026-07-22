@@ -15,7 +15,7 @@ echo "================================================================"
 
 # Step 1: Ensure image is built
 echo "1️⃣ Building Docker image docker-tools-dockerforge:latest..."
-docker build -t docker-tools-dockerforge:latest -t docker-tools-dockerforge:1.1.0 "${PROJECT_DIR}"
+docker build --platform linux/amd64 -t docker-tools-dockerforge:latest -t docker-tools-dockerforge:1.1.0 "${PROJECT_DIR}"
 
 # Step 2: Prepare clean distribution directory
 echo "2️⃣ Preparing distribution folder structure..."
@@ -32,6 +32,10 @@ echo "4️⃣ Copying release documentation, source code, and launch scripts..."
 cp "${PROJECT_DIR}/docker-compose.yml" "${TARGET_DIR}/"
 cp "${PROJECT_DIR}/start-airgap.sh" "${TARGET_DIR}/"
 cp "${PROJECT_DIR}/start-standalone.sh" "${TARGET_DIR}/"
+cp "${PROJECT_DIR}/install-podman-offline.sh" "${TARGET_DIR}/"
+if [ -d "${PROJECT_DIR}/podman-rpms" ]; then
+    cp -r "${PROJECT_DIR}/podman-rpms" "${TARGET_DIR}/"
+fi
 cp -r "${PROJECT_DIR}/backend" "${TARGET_DIR}/"
 cp -r "${PROJECT_DIR}/frontend" "${TARGET_DIR}/"
 cp "${PROJECT_DIR}/LICENSE" "${TARGET_DIR}/"
