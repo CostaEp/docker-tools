@@ -1,7 +1,7 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
-   - Real-Time Container Resource Telemetry (RAM usage, Peak memory, CPU %)
+   - Interactive Live Resource Telemetry Sparklines (RAM & CPU SVG curves updated live)
    - Smart Dynamic Sizing Recommendation Engine (Peak RAM + 50% safety buffer)
    - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
    - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
@@ -23,17 +23,30 @@ let currentFullYaml = '';
 let activeModalTab = 'full'; // 'full' or 'fix'
 let currentActiveFixKey = null;
 
+// Telemetry History for Live Charts (up to 20 points)
+let ramHistory = [];
+let cpuHistory = [];
+let telemetryTimer = null;
+
 export async function renderQA(container) {
+  // Clear any existing polling timer on re-render
+  if (telemetryTimer) {
+    clearInterval(telemetryTimer);
+    telemetryTimer = null;
+  }
+
   container.innerHTML = `
     <style>
-      .qa-grid { display:grid; grid-template-columns:360px 1fr; gap:20px; height:100%; }
+      .qa-grid { display:grid; grid-template-columns: minmax(420px, 460px) 1fr; gap:20px; height:100%; }
+      @media (max-width: 1200px) { .qa-grid { grid-template-columns: 1fr; } }
+
       .qa-card { background:var(--bg-raised); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:var(--shadow-sm); }
       .qa-card-title { font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
 
       /* Sleek Redesigned Score Display */
       .score-display-card {
         background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-        border: 1px solid var(--border-bright); border-radius: 14px; padding: 20px;
+        border: 1px solid var(--border-bright); border-radius: 14px; padding: 18px;
         display: flex; align-items: center; gap: 20px; margin-bottom: 14px; position: relative; overflow: hidden;
       }
       
@@ -50,29 +63,32 @@ export async function renderQA(container) {
       .score-meta-title { font-size: 26px; font-weight: 800; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
       .score-meta-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
-      /* Sleek Recommendation Cards */
-      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding-right: 4px; }
+      /* Sleek Recommendation Cards (Non-overflowing) */
+      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
       
       .recom-card {
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
         padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; transition: all 0.2s ease;
+        box-sizing: border-box; width: 100%;
       }
       .recom-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
 
-      .recom-card.deduction { border-left: 3px solid #ef4444; }
-      .recom-card.bonus     { border-left: 3px solid #22c55e; }
+      .recom-card.deduction { border-left: 4px solid #ef4444; }
+      .recom-card.bonus     { border-left: 4px solid #22c55e; }
 
-      .recom-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-      .recom-label  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+      .recom-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+      .recom-label  { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; flex: 1; }
       
-      .pts-badge { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; font-family: var(--font-mono); }
+      .pts-badge { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; font-family: var(--font-mono); flex-shrink: 0; }
       .pts-badge.neg { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
       .pts-badge.pos { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
 
-      .recom-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
+      .recom-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; word-break: break-word; }
+
+      .recom-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
       /* Diag buttons */
-      .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+      .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
       .diag-btn {
         display: flex; align-items: center; gap: 8px; padding: 10px 14px;
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px;
@@ -124,6 +140,11 @@ export async function renderQA(container) {
 
       .modal-tab-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
       .modal-tab-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+
+      /* Live Sparkline Card */
+      .sparkline-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
+      .sparkline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .sparkline-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
     </style>
 
     <!-- Fix Preview & Full YAML Modal -->
@@ -158,7 +179,7 @@ export async function renderQA(container) {
     </div>
 
     <div class="qa-grid">
-      <!-- LEFT COLUMN: Container Selector + Health & Quality Scorecard -->
+      <!-- LEFT COLUMN: Container Selector + Health & Quality Scorecard + Live Sparkline Telemetry -->
       <div style="display:flex;flex-direction:column;gap:16px;">
 
         <!-- Container Selector -->
@@ -169,12 +190,42 @@ export async function renderQA(container) {
           </select>
         </div>
 
+        <!-- Live Resource Telemetry Sparkline Graphs (Charts) -->
+        <div class="qa-card" id="qa-telemetry-card" style="display:none">
+          <div class="qa-card-title" style="justify-content:space-between">
+            <span><i class="ph ph-chart-line-up"></i> Live Telemetry & Resource Curves</span>
+            <span style="font-size:10px;color:var(--accent-start);background:var(--accent-glow);padding:2px 6px;border-radius:4px;font-weight:700">● LIVE (3s)</span>
+          </div>
+
+          <!-- RAM Sparkline Chart -->
+          <div class="sparkline-card">
+            <div class="sparkline-header">
+              <span class="sparkline-title"><i class="ph ph-cpu"></i> RAM Memory Curve</span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00c6ff" id="qa-chart-ram-text">0 MB</span>
+            </div>
+            <div id="qa-chart-ram-svg"></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono)">
+              <span id="qa-chart-ram-peak">Peak: 0 MB</span>
+              <span id="qa-chart-ram-rec" style="color:var(--accent-start)">Rec Limit: 256 MB</span>
+            </div>
+          </div>
+
+          <!-- CPU Sparkline Chart -->
+          <div class="sparkline-card" style="margin-bottom:0">
+            <div class="sparkline-header">
+              <span class="sparkline-title"><i class="ph ph-lightning"></i> CPU Load Curve</span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#22c55e" id="qa-chart-cpu-text">0.0%</span>
+            </div>
+            <div id="qa-chart-cpu-svg"></div>
+          </div>
+        </div>
+
         <!-- Redesigned Scorecard Card -->
         <div class="qa-card" id="qa-score-card">
           <div class="qa-card-title" style="justify-content:space-between">
             <span><i class="ph ph-shield-check"></i> Quality & Health Rating</span>
             <button class="btn btn-secondary btn-sm" id="btn-copy-top-yaml" style="display:none;font-size:11px;padding:4px 8px" onclick="window.qaShowFullYamlModal()">
-              <i class="ph ph-file-code"></i> Copy Full docker-compose.yml
+              <i class="ph ph-file-code"></i> Copy Full YAML
             </button>
           </div>
           <div id="qa-score-area">
@@ -302,23 +353,130 @@ export async function renderQA(container) {
 /* ── Container Selection ─────────────────────────────────────────────────── */
 async function qaOnSelectContainer(id) {
   selectedContainerId = id;
+  ramHistory = [];
+  cpuHistory = [];
+
+  if (telemetryTimer) {
+    clearInterval(telemetryTimer);
+    telemetryTimer = null;
+  }
+
   if (!id) return;
   await loadScore(id);
+
+  // Start 3-second auto-polling loop for live telemetry curves
+  telemetryTimer = setInterval(async () => {
+    if (selectedContainerId === id) {
+      await pollTelemetry(id);
+    }
+  }, 3000);
+}
+
+/* ── Render Live SVG Sparkline Chart ─────────────────────────────────────── */
+function renderSparklineSvg(points, color = '#00c6ff', height = 36, width = 340) {
+  if (!points || points.length === 0) {
+    return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px"><line x1="0" y1="${height/2}" x2="${width}" y2="${height/2}" stroke="${color}" stroke-opacity="0.3" stroke-dasharray="4"/></svg>`;
+  }
+
+  const maxVal = Math.max(...points, 1);
+  const minVal = Math.min(...points, 0);
+  const range  = (maxVal - minVal) || 1;
+
+  const pathCoords = points.map((val, idx) => {
+    const x = (idx / Math.max(1, points.length - 1)) * width;
+    const y = height - ((val - minVal) / range) * (height - 10) - 5;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const d = `M ${pathCoords.join(' L ')}`;
+  const areaD = `M 0,${height} L ${pathCoords.join(' L ')} L ${width},${height} Z`;
+
+  const safeColor = color.replace('#', '');
+
+  return `
+    <svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px;overflow:visible">
+      <defs>
+        <linearGradient id="grad-${safeColor}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0.0"/>
+        </linearGradient>
+      </defs>
+      <path d="${areaD}" fill="url(#grad-${safeColor})" />
+      <path d="${d}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  `;
+}
+
+/* ── Poll Telemetry for Live Curves ──────────────────────────────────────── */
+async function pollTelemetry(id) {
+  try {
+    const data = await api.qa.containerScore(id);
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256 };
+
+    ramHistory.push(t.usageMB);
+    if (ramHistory.length > 20) ramHistory.shift();
+
+    cpuHistory.push(t.cpuPercent);
+    if (cpuHistory.length > 20) cpuHistory.shift();
+
+    // Update Sparkline Charts
+    const ramText = document.getElementById('qa-chart-ram-text');
+    const ramSvg  = document.getElementById('qa-chart-ram-svg');
+    const ramPeak = document.getElementById('qa-chart-ram-peak');
+    const ramRec  = document.getElementById('qa-chart-ram-rec');
+    
+    const cpuText = document.getElementById('qa-chart-cpu-text');
+    const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
+
+    if (ramText) ramText.textContent = `${t.usageMB} MB`;
+    if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
+    if (ramRec)  ramRec.textContent  = `Rec Limit: ${t.recMemMB} MB`;
+    if (ramSvg)  ramSvg.innerHTML    = renderSparklineSvg(ramHistory, '#00c6ff');
+
+    if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
+    if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
+
+  } catch (err) {
+    // Ignore silent polling errors
+  }
 }
 
 /* ── Load Redesigned Scorecard ────────────────────────────────────────────── */
 async function loadScore(id) {
   const area = document.getElementById('qa-score-area');
   const copyTopBtn = document.getElementById('btn-copy-top-yaml');
+  const telemetryCard = document.getElementById('qa-telemetry-card');
   if (!area) return;
+
   area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><i class="ph ph-spinner"></i> Evaluating container quality rating & live telemetry...</div>';
 
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0 };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256 };
     currentFullYaml = data.fullComposeYaml || '';
     if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
+    if (telemetryCard) telemetryCard.style.display = 'block';
+
+    ramHistory = [t.usageMB];
+    cpuHistory = [t.cpuPercent];
+
+    // Initial render of Live Sparklines
+    const ramText = document.getElementById('qa-chart-ram-text');
+    const ramSvg  = document.getElementById('qa-chart-ram-svg');
+    const ramPeak = document.getElementById('qa-chart-ram-peak');
+    const ramRec  = document.getElementById('qa-chart-ram-rec');
+    
+    const cpuText = document.getElementById('qa-chart-cpu-text');
+    const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
+
+    if (ramText) ramText.textContent = `${t.usageMB} MB`;
+    if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
+    if (ramRec)  ramRec.textContent  = `Rec Limit: ${t.recMemMB} MB`;
+    if (ramSvg)  ramSvg.innerHTML    = renderSparklineSvg(ramHistory, '#00c6ff');
+
+    if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
+    if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
 
     currentDeductionsMap = {};
     (data.deductions || []).forEach(d => { currentDeductionsMap[d.key] = d; });
@@ -343,24 +501,6 @@ async function loadScore(id) {
         </div>
       </div>
 
-      <!-- Real-Time Resource Telemetry Card -->
-      <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:12px">
-        <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;justify-space-between">
-          <span>📊 Live Telemetry Stats</span>
-          <span style="color:var(--accent-start)">REAL-TIME</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;font-family:var(--font-mono)">
-          <div>
-            <div style="color:var(--text-secondary);font-size:10px">RAM Usage / Peak</div>
-            <div style="font-weight:700;color:var(--text-primary)">${t.usageMB} MB <span style="font-size:9.5px;color:var(--text-muted)">(Peak: ${t.maxMB} MB)</span></div>
-          </div>
-          <div>
-            <div style="color:var(--text-secondary);font-size:10px">CPU Load</div>
-            <div style="font-weight:700;color:var(--text-primary)">${t.cpuPercent}%</div>
-          </div>
-        </div>
-      </div>
-
       <div class="recom-list">
         ${data.deductions.map(d => `
           <div class="recom-card deduction">
@@ -369,7 +509,7 @@ async function loadScore(id) {
               <span class="pts-badge neg">${d.pts}</span>
             </div>
             ${d.recommendation ? `<div class="recom-desc">💡 ${escapeHtml(d.recommendation)}</div>` : ''}
-            <div style="display:flex;gap:6px;margin-top:4px">
+            <div class="recom-actions">
               ${d.fixable ? `
                 <button class="btn btn-success btn-sm" onclick="window.qaApplyFix('${d.key}', ${d.recMemMB || 512})">
                   <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Live Fix')}
