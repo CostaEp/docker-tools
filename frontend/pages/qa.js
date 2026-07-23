@@ -1,5 +1,6 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
+   - Live Path & Directory Autocomplete (Instant Tab / Click autocomplete for folders & files inside container)
    - 100% Full-Width Single Stack Vertical Layout (No side-by-side cramped columns)
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
    - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Storage Root FS + Volumes SVG curves updated live)
@@ -28,6 +29,7 @@ let ramHistory = [];
 let cpuHistory = [];
 let diskHistory = [];
 let telemetryTimer = null;
+let autocompleteDebounce = null;
 
 export async function renderQA(container) {
   // Clear any existing polling timer on re-render
@@ -114,6 +116,29 @@ export async function renderQA(container) {
         color: #e6edf3; min-height: 180px; max-height: 340px; overflow: auto; white-space: pre-wrap;
       }
       
+      /* Path Autocomplete Dropdown */
+      .qa-autocomplete-wrap { position: relative; flex: 1; }
+      .qa-autocomplete-dropdown {
+        position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+        background: var(--bg-raised); border: 1px solid var(--border-bright);
+        border-radius: 10px; max-height: 240px; overflow-y: auto; z-index: 1000;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.6); font-family: var(--font-mono); font-size: 12px;
+      }
+      .qa-autocomplete-item {
+        padding: 8px 12px; color: var(--text-secondary); cursor: pointer;
+        display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        transition: background 0.15s ease; border-bottom: 1px solid rgba(255,255,255,0.03);
+      }
+      .qa-autocomplete-item:last-child { border-bottom: none; }
+      .qa-autocomplete-item:hover, .qa-autocomplete-item.active {
+        background: var(--accent-glow); color: var(--text-primary);
+      }
+      .qa-autocomplete-item .item-type-tag {
+        font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;
+      }
+      .qa-autocomplete-item .item-type-tag.dir { background: rgba(0,198,255,0.15); color: #00c6ff; }
+      .qa-autocomplete-item .item-type-tag.file { background: rgba(34,197,94,0.15); color: #22c55e; }
+
       /* File explorer styling (Roomy & Large: max-height 600px) */
       .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
       .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
@@ -285,21 +310,27 @@ export async function renderQA(container) {
         <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
       </div>
 
-      <!-- CARD 5: Live File Explorer & Permissions Manager (Roomy Large View) -->
+      <!-- CARD 5: Live File Explorer & Permissions Manager (With Live Path Autocomplete) -->
       <div class="qa-card">
         <div class="qa-card-title" style="justify-content:space-between">
           <span><i class="ph ph-folder-open"></i> Live File Explorer (Colorized 777 & Perms)</span>
           <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
         </div>
 
-        <!-- Navigation Bar -->
+        <!-- Navigation Bar & Autocomplete Input -->
         <div class="file-toolbar">
-          <div style="display:flex;gap:8px;flex:1;">
+          <div style="display:flex;gap:8px;flex:1;position:relative">
             <button class="btn btn-secondary btn-sm" onclick="window.qaNavUp()" title="Go up one directory">
               <i class="ph ph-arrow-up"></i> ..
             </button>
-            <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Directory path (e.g. /app, /etc)..." style="flex:1">
-            <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open Dir</button>
+
+            <!-- Autocomplete Wrapper -->
+            <div class="qa-autocomplete-wrap">
+              <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Type directory/file path (e.g. /etc/, /app/)..." autocomplete="off" oninput="window.qaOnPathInput(this.value)" onkeydown="window.qaOnPathKeydown(event)">
+              <div id="qa-path-autocomplete-dropdown" class="qa-autocomplete-dropdown" style="display:none"></div>
+            </div>
+
+            <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open</button>
           </div>
 
           <!-- Sort & View Controls -->
@@ -334,22 +365,33 @@ export async function renderQA(container) {
     </div>
   `;
 
-  window.qaOnSelectContainer = qaOnSelectContainer;
-  window.qaRunDiag           = qaRunDiag;
-  window.qaRunPing           = qaRunPing;
-  window.qaLoadDir           = qaLoadDir;
-  window.qaNavUp             = qaNavUp;
-  window.qaSetSort           = qaSetSort;
-  window.qaSetViewMode       = qaSetViewMode;
-  window.qaOpenFile          = qaOpenFile;
-  window.qaSaveFile          = qaSaveFile;
-  window.qaApplyFix          = qaApplyFix;
-  window.qaChmod             = qaChmod;
-  window.qaChown             = qaChown;
-  window.qaShowFixModal      = qaShowFixModal;
-  window.qaShowFullYamlModal = qaShowFullYamlModal;
-  window.qaCloseModal        = qaCloseModal;
-  window.qaSwitchModalTab    = qaSwitchModalTab;
+  window.qaOnSelectContainer  = qaOnSelectContainer;
+  window.qaRunDiag            = qaRunDiag;
+  window.qaRunPing            = qaRunPing;
+  window.qaLoadDir            = qaLoadDir;
+  window.qaNavUp              = qaNavUp;
+  window.qaSetSort            = qaSetSort;
+  window.qaSetViewMode        = qaSetViewMode;
+  window.qaOpenFile           = qaOpenFile;
+  window.qaSaveFile           = qaSaveFile;
+  window.qaApplyFix           = qaApplyFix;
+  window.qaChmod              = qaChmod;
+  window.qaChown              = qaChown;
+  window.qaShowFixModal       = qaShowFixModal;
+  window.qaShowFullYamlModal  = qaShowFullYamlModal;
+  window.qaCloseModal         = qaCloseModal;
+  window.qaSwitchModalTab     = qaSwitchModalTab;
+  window.qaOnPathInput        = qaOnPathInput;
+  window.qaOnPathKeydown      = qaOnPathKeydown;
+  window.qaSelectAutocomplete = qaSelectAutocomplete;
+
+  // Close autocomplete on click outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.qa-autocomplete-wrap')) {
+      const drop = document.getElementById('qa-path-autocomplete-dropdown');
+      if (drop) drop.style.display = 'none';
+    }
+  });
 
   // Load container list
   try {
@@ -372,6 +414,115 @@ export async function renderQA(container) {
     }
   } catch (err) {
     toast(`Failed to load containers: ${err.message}`, 'error');
+  }
+}
+
+/* ── Live Path Autocomplete Logic ────────────────────────────────────────── */
+function qaOnPathInput(val) {
+  if (autocompleteDebounce) clearTimeout(autocompleteDebounce);
+  const dropdown = document.getElementById('qa-path-autocomplete-dropdown');
+  if (!dropdown) return;
+
+  if (!val || !selectedContainerId) {
+    dropdown.style.display = 'none';
+    return;
+  }
+
+  autocompleteDebounce = setTimeout(async () => {
+    try {
+      const cleanVal = val.replace(/\/+/g, '/');
+      let parentDir = '/';
+      let searchPrefix = '';
+
+      if (cleanVal.endsWith('/')) {
+        parentDir = cleanVal;
+        searchPrefix = '';
+      } else {
+        const lastSlash = cleanVal.lastIndexOf('/');
+        if (lastSlash >= 0) {
+          parentDir = cleanVal.substring(0, lastSlash + 1) || '/';
+          searchPrefix = cleanVal.substring(lastSlash + 1).toLowerCase();
+        } else {
+          parentDir = '/';
+          searchPrefix = cleanVal.toLowerCase();
+        }
+      }
+
+      const res = await api.qa.listFiles(selectedContainerId, parentDir);
+      const items = res.items || [];
+
+      const matches = items.filter(item => item.name.toLowerCase().startsWith(searchPrefix));
+
+      if (matches.length === 0) {
+        dropdown.style.display = 'none';
+        return;
+      }
+
+      dropdown.innerHTML = matches.slice(0, 15).map((item, idx) => {
+        const fullPath = (parentDir.replace(/\/$/, '') + '/' + item.name + (item.isDir ? '/' : '')).replace(/\/+/g, '/');
+        return `
+          <div class="qa-autocomplete-item ${idx === 0 ? 'active' : ''}" onclick="window.qaSelectAutocomplete('${fullPath}', ${item.isDir})">
+            <span>${item.isDir ? '📁' : '📄'} ${escapeHtml(fullPath)}</span>
+            <span class="item-type-tag ${item.isDir ? 'dir' : 'file'}">${item.isDir ? 'DIR' : 'FILE'}</span>
+          </div>
+        `;
+      }).join('');
+
+      dropdown.style.display = 'block';
+    } catch (e) {
+      dropdown.style.display = 'none';
+    }
+  }, 180);
+}
+
+function qaOnPathKeydown(e) {
+  const dropdown = document.getElementById('qa-path-autocomplete-dropdown');
+  if (!dropdown || dropdown.style.display === 'none') {
+    if (e.key === 'Enter') {
+      qaLoadDir();
+    }
+    return;
+  }
+
+  const items = Array.from(dropdown.querySelectorAll('.qa-autocomplete-item'));
+  if (!items.length) return;
+
+  let activeIdx = items.findIndex(el => el.classList.contains('active'));
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (activeIdx >= 0) items[activeIdx].classList.remove('active');
+    activeIdx = (activeIdx + 1) % items.length;
+    items[activeIdx].classList.add('active');
+    items[activeIdx].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (activeIdx >= 0) items[activeIdx].classList.remove('active');
+    activeIdx = (activeIdx - 1 + items.length) % items.length;
+    items[activeIdx].classList.add('active');
+    items[activeIdx].scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault();
+    const currentActive = items[activeIdx >= 0 ? activeIdx : 0];
+    if (currentActive) {
+      currentActive.click();
+    }
+  } else if (e.key === 'Escape') {
+    dropdown.style.display = 'none';
+  }
+}
+
+async function qaSelectAutocomplete(path, isDir) {
+  const input = document.getElementById('qa-dir-input');
+  const dropdown = document.getElementById('qa-path-autocomplete-dropdown');
+  if (dropdown) dropdown.style.display = 'none';
+
+  if (input) input.value = path;
+
+  if (isDir) {
+    await qaLoadDir();
+  } else {
+    await qaOpenFile(path, false);
   }
 }
 
