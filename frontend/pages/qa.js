@@ -3,7 +3,7 @@
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
    - Interactive 1-Click Fixes & Recommendations Engine
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer with chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
+   - Container File Explorer with 777 warning badges, colorized permissions, file type highlighting, chmod / chown controls, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -84,9 +84,29 @@ export async function renderQA(container) {
       .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
       .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
       .file-tree-table th { text-align: left; padding: 6px 10px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
-      .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; }
+      .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; vertical-align: middle; }
       .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); }
-      .file-tree-table tr.dir td { font-weight: 700; color: var(--accent-start); }
+      
+      /* Row highlighting for 777 */
+      .file-tree-table tr.is-777 td { background: rgba(239, 68, 68, 0.08); }
+      .file-tree-table tr.is-777:hover td { background: rgba(239, 68, 68, 0.15); }
+
+      /* Permission Badges */
+      .perm-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 4px; }
+      .perm-badge.p-777 { background: rgba(239,68,68,0.25); color: #ff5252; border: 1px solid rgba(239,68,68,0.5); box-shadow: 0 0 8px rgba(239,68,68,0.3); animation: pulse-777 2s infinite; }
+      @keyframes pulse-777 { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+      .perm-badge.p-exec     { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+      .perm-badge.p-readonly { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); }
+      .perm-badge.p-std      { background: rgba(0,198,255,0.1); color: #00c6ff; border: 1px solid rgba(0,198,255,0.2); }
+
+      /* File Name Highlights */
+      .file-name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+      .file-name.dir-name   { color: #00c6ff; font-weight: 700; }
+      .file-name.exec-file  { color: #22c55e; }
+      .file-name.config-file{ color: #f59e0b; }
+      .file-name.hidden-file{ color: var(--text-muted); font-style: italic; }
+      .file-name.std-file   { color: var(--text-primary); }
 
       .view-toggle-btn { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; }
       .view-toggle-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
@@ -145,10 +165,10 @@ export async function renderQA(container) {
           <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
         </div>
 
-        <!-- Live File Browser & Editor (with ls -la + chmod / chown support) -->
+        <!-- Live File Browser & Editor (with ls -la + chmod / chown + 777 color highlighting) -->
         <div class="qa-card">
           <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-folder-open"></i> Live File Explorer & Permissions (chmod / chown)</span>
+            <span><i class="ph ph-folder-open"></i> Live File Explorer (Colorized 777 & Perms)</span>
             <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
           </div>
 
@@ -348,7 +368,7 @@ async function qaRunPing() {
   }
 }
 
-/* ── File Explorer (with ls -la parsing + chmod / chown) ─────────────────── */
+/* ── File Explorer (with ls -la parsing + chmod / chown + 777 highlight) ─── */
 function qaNavUp() {
   let p = currentPath.replace(/\/$/, '');
   const lastIdx = p.lastIndexOf('/');
@@ -389,6 +409,52 @@ async function qaLoadDir() {
   }
 }
 
+/* ── Format Permissions Badge (777 Warning Highlight) ────────────────────── */
+function formatPermsBadge(perms) {
+  if (!perms || perms === '—') return '<span>—</span>';
+
+  const is777 = perms.includes('rwxrwxrwx') || perms.includes('rwxrwxrwt');
+  if (is777) {
+    return `<span class="perm-badge p-777" title="777 World Writable — Dangerous Security Risk!">⚠️ ${escapeHtml(perms)} (777)</span>`;
+  }
+
+  const isExec = perms.includes('x');
+  if (isExec) {
+    return `<span class="perm-badge p-exec">${escapeHtml(perms)}</span>`;
+  }
+
+  const isReadOnly = perms.startsWith('-r--') || perms.startsWith('-r--r--r--');
+  if (isReadOnly) {
+    return `<span class="perm-badge p-readonly">${escapeHtml(perms)}</span>`;
+  }
+
+  return `<span class="perm-badge p-std">${escapeHtml(perms)}</span>`;
+}
+
+/* ── Format File / Folder Name Highlighting ──────────────────────────────── */
+function formatFileName(name, isDir) {
+  if (isDir) {
+    return `<span class="file-name dir-name">📁 ${escapeHtml(name)}</span>`;
+  }
+
+  const isHidden = name.startsWith('.');
+  const ext = name.split('.').pop()?.toLowerCase();
+
+  if (['sh', 'bash', 'py', 'js', 'bin', 'exe', 'pl'].includes(ext)) {
+    return `<span class="file-name exec-file">⚡ ${escapeHtml(name)}</span>`;
+  }
+
+  if (['env', 'pem', 'key', 'json', 'yml', 'yaml', 'conf', 'config'].includes(ext) || name.includes('config') || name === '.env' || name === 'Dockerfile') {
+    return `<span class="file-name config-file">🔒 ${escapeHtml(name)}</span>`;
+  }
+
+  if (isHidden) {
+    return `<span class="file-name hidden-file">📄 ${escapeHtml(name)}</span>`;
+  }
+
+  return `<span class="file-name std-file">📄 ${escapeHtml(name)}</span>`;
+}
+
 function renderFileTreeOutput() {
   const treeEl = document.getElementById('qa-file-tree');
   if (!treeEl) return;
@@ -415,18 +481,16 @@ function renderFileTreeOutput() {
         </tr>
       </thead>
       <tbody>
-        ${fetchedItems.map((item, idx) => {
-          const icon = item.isDir ? '📁' : '📄';
+        ${fetchedItems.map((item) => {
           const full = `${currentPath.replace(/\/$/, '')}/${item.name}`;
-          const isHidden = item.name.startsWith('.');
-          return `<tr class="${item.isDir ? 'dir' : ''}">
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.perms || '—'}</td>
+          const is777 = (item.perms || '').includes('rwxrwxrwx');
+          
+          return `<tr class="${item.isDir ? 'dir' : ''} ${is777 ? 'is-777' : ''}">
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${formatPermsBadge(item.perms)}</td>
             <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.owner || 'root'}</td>
             <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.size || '0'}</td>
             <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.date || '—'}</td>
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">
-              <span>${icon}</span> <span style="${isHidden ? 'opacity:0.75;font-style:italic' : ''}">${escapeHtml(item.name)}</span>
-            </td>
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${formatFileName(item.name, item.isDir)}</td>
             <td>
               <div style="display:flex;gap:4px">
                 <button class="file-action-btn" onclick="event.stopPropagation();window.qaChmod('${full}', '${item.perms}')" title="Change permissions (chmod)">🔑 chmod</button>
