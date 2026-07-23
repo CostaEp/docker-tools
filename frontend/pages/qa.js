@@ -3,7 +3,7 @@
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
    - Interactive 1-Click Fixes & Recommendations Engine
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer & Live In-Place File Editor
+   - Container File Explorer with robust ls -la / ls -la -tr parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -11,6 +11,9 @@ import toast from '/toast.js';
 
 let selectedContainerId = null;
 let currentPath = '/app';
+let currentSort = 'default'; // 'default', 'tr', 'S'
+let currentViewMode = 'table'; // 'table' or 'raw'
+let rawLsOutput = '';
 
 export async function renderQA(container) {
   container.innerHTML = `
@@ -76,11 +79,16 @@ export async function renderQA(container) {
         color: #e6edf3; min-height: 180px; max-height: 300px; overflow: auto; white-space: pre-wrap;
       }
       
-      /* File explorer */
-      .file-tree { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); padding: 8px; }
-      .file-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: var(--font-mono); cursor: pointer; color: var(--text-secondary); transition: 0.15s; }
-      .file-item:hover { background: var(--bg-hover); color: var(--text-primary); }
-      .file-item.dir { font-weight: 700; color: var(--accent-start); }
+      /* File explorer styling */
+      .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+      .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
+      .file-tree-table th { text-align: left; padding: 6px 10px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
+      .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; }
+      .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); cursor: pointer; }
+      .file-tree-table tr.dir td { font-weight: 700; color: var(--accent-start); }
+
+      .view-toggle-btn { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; }
+      .view-toggle-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
     </style>
 
     <div class="section-header">
@@ -133,20 +141,38 @@ export async function renderQA(container) {
           <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
         </div>
 
-        <!-- Live File Browser & Editor -->
+        <!-- Live File Browser & Editor (with ls -la support) -->
         <div class="qa-card">
           <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-folder-open"></i> Live File Explorer & Editor</span>
+            <span><i class="ph ph-folder-open"></i> Live File Explorer & Editor (ls -la)</span>
             <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
           </div>
 
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
-            <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Directory path (e.g. /app, /etc)..." style="flex:1">
-            <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open Dir</button>
+          <!-- Navigation Bar -->
+          <div class="file-toolbar">
+            <div style="display:flex;gap:6px;flex:1;">
+              <button class="btn btn-secondary btn-sm" onclick="window.qaNavUp()" title="Go up one directory">
+                <i class="ph ph-arrow-up"></i> ..
+              </button>
+              <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Directory path (e.g. /app, /etc)..." style="flex:1">
+              <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open Dir</button>
+            </div>
+
+            <!-- Sort & View Controls -->
+            <div style="display:flex;gap:6px;">
+              <select class="form-control" id="qa-sort-sel" onchange="window.qaSetSort(this.value)" style="padding:4px 8px;font-size:11px;width:120px">
+                <option value="default">ls -la (Name)</option>
+                <option value="tr">ls -la -tr (Date)</option>
+                <option value="S">ls -la -S (Size)</option>
+              </select>
+
+              <button class="view-toggle-btn active" id="btn-view-table" onclick="window.qaSetViewMode('table')" title="Formatted Table View">📋 Table</button>
+              <button class="view-toggle-btn" id="btn-view-raw" onclick="window.qaSetViewMode('raw')" title="Raw ls -la Terminal Output">🖥️ Raw</button>
+            </div>
           </div>
 
-          <!-- File Tree -->
-          <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px">
+          <!-- File Tree / Raw Output Container -->
+          <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px;max-height:240px">
             <div style="color:var(--text-muted);font-size:12px;padding:8px">Enter directory path and click Open Dir.</div>
           </div>
 
@@ -169,6 +195,9 @@ export async function renderQA(container) {
   window.qaRunDiag           = qaRunDiag;
   window.qaRunPing           = qaRunPing;
   window.qaLoadDir           = qaLoadDir;
+  window.qaNavUp             = qaNavUp;
+  window.qaSetSort           = qaSetSort;
+  window.qaSetViewMode       = qaSetViewMode;
   window.qaOpenFile          = qaOpenFile;
   window.qaSaveFile          = qaSaveFile;
   window.qaApplyFix          = qaApplyFix;
@@ -216,10 +245,9 @@ async function loadScore(id) {
     const score = data.score;
 
     const strokeColor = score >= 80 ? '#22c55e' : score >= 70 ? '#00c6ff' : score >= 60 ? '#f59e0b' : '#ef4444';
-    const strokeDash  = Math.round((score / 100) * 188); // circumference of r=30 is ~188
+    const strokeDash  = Math.round((score / 100) * 188);
 
     area.innerHTML = `
-      <!-- Sleek Score Ring Display -->
       <div class="score-display-card">
         <div class="score-ring-wrap">
           <svg viewBox="0 0 70 70">
@@ -236,7 +264,6 @@ async function loadScore(id) {
         </div>
       </div>
 
-      <!-- Deductions & Actionable Fixes -->
       <div class="recom-list">
         ${data.deductions.map(d => `
           <div class="recom-card deduction">
@@ -315,7 +342,30 @@ async function qaRunPing() {
   }
 }
 
-/* ── File Explorer ───────────────────────────────────────────────────────── */
+/* ── File Explorer (with ls -la parsing) ─────────────────────────────────── */
+function qaNavUp() {
+  let p = currentPath.replace(/\/$/, '');
+  const lastIdx = p.lastIndexOf('/');
+  if (lastIdx <= 0) p = '/';
+  else p = p.substring(0, lastIdx);
+  document.getElementById('qa-dir-input').value = p;
+  qaLoadDir();
+}
+
+function qaSetSort(mode) {
+  currentSort = mode;
+  qaLoadDir();
+}
+
+function qaSetViewMode(mode) {
+  currentViewMode = mode;
+  document.getElementById('btn-view-table')?.classList.toggle('active', mode === 'table');
+  document.getElementById('btn-view-raw')?.classList.toggle('active', mode === 'raw');
+  renderFileTreeOutput();
+}
+
+let fetchedItems = [];
+
 async function qaLoadDir() {
   if (!selectedContainerId) { toast('Select a container first', 'error'); return; }
   const path = document.getElementById('qa-dir-input')?.value?.trim() || '/app';
@@ -323,25 +373,62 @@ async function qaLoadDir() {
   document.getElementById('qa-file-path-badge').textContent = path;
 
   const treeEl = document.getElementById('qa-file-tree');
-  treeEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px">Listing files...</div>';
+  treeEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px"><i class="ph ph-spinner"></i> Running ls -la...</div>';
 
   try {
-    const res = await api.qa.listFiles(selectedContainerId, path);
-    if (!res.items || !res.items.length) {
-      treeEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px">Directory is empty.</div>';
-      return;
-    }
+    // Call API with sort mode
+    const res = await fetch(`/api/qa/containers/${selectedContainerId}/files?path=${encodeURIComponent(path)}&sort=${currentSort}`).then(r => r.json());
+    if (res.error) throw new Error(res.error);
 
-    treeEl.innerHTML = res.items.map(item => {
-      const icon = item.isDir ? '📁' : '📄';
-      const full = `${path.replace(/\/$/, '')}/${item.name}`;
-      return `<div class="file-item ${item.isDir ? 'dir' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
-        <span>${icon}</span> <span>${escapeHtml(item.name)}</span>
-      </div>`;
-    }).join('');
+    fetchedItems = res.items || [];
+    rawLsOutput = res.raw || '(empty directory output)';
+    renderFileTreeOutput();
   } catch (err) {
     treeEl.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:6px">${err.message}</div>`;
   }
+}
+
+function renderFileTreeOutput() {
+  const treeEl = document.getElementById('qa-file-tree');
+  if (!treeEl) return;
+
+  if (currentViewMode === 'raw') {
+    treeEl.innerHTML = `<pre style="margin:0;font-family:var(--font-mono);font-size:11px;color:#e6edf3;white-space:pre">${escapeHtml(rawLsOutput)}</pre>`;
+    return;
+  }
+
+  if (!fetchedItems.length) {
+    treeEl.innerHTML = `
+      <div style="color:var(--text-muted);font-size:12px;padding:12px;text-align:center">
+        No files in this directory or empty output.
+        <br><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="window.qaSetViewMode('raw')">View Raw Output</button>
+      </div>`;
+    return;
+  }
+
+  treeEl.innerHTML = `
+    <table class="file-tree-table">
+      <thead>
+        <tr>
+          <th>Perms</th><th>Owner</th><th>Size</th><th>Date</th><th>Name</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${fetchedItems.map(item => {
+          const icon = item.isDir ? '📁' : '📄';
+          const full = `${currentPath.replace(/\/$/, '')}/${item.name}`;
+          const isHidden = item.name.startsWith('.');
+          return `<tr class="${item.isDir ? 'dir' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
+            <td>${item.perms || '—'}</td>
+            <td>${item.owner || 'root'}</td>
+            <td>${item.size || '0'}</td>
+            <td>${item.date || '—'}</td>
+            <td><span>${icon}</span> <span style="${isHidden ? 'opacity:0.75;font-style:italic' : ''}">${escapeHtml(item.name)}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
 }
 
 async function qaOpenFile(fullPath, isDir) {

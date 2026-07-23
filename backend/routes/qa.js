@@ -4,7 +4,7 @@
    POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F) + fixes
    POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
-   GET  /api/qa/containers/:id/files   — List directory contents inside container
+   GET  /api/qa/containers/:id/files   — List directory contents inside container (ls -la / ls -la -tr)
    POST /api/qa/containers/:id/read    — Read file content inside container
    POST /api/qa/containers/:id/write   — Write/save file content inside container (live edit)
    ────────────────────────────────────────────────────────────────────────── */
@@ -251,6 +251,43 @@ async function execInContainer(container, cmdArray) {
   });
 }
 
+/* ── Robust ls -la Line Parser ────────────────────────────────────────────── */
+function parseLsLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('total')) return null;
+  const parts = trimmed.split(/\s+/);
+  if (parts.length < 2) return null;
+
+  const perms = parts[0];
+  const isDir = perms.startsWith('d');
+  const isSymlink = perms.startsWith('l');
+
+  // Find filename start index dynamically by looking for time or year field
+  let nameIndex = 8;
+  for (let i = 4; i < parts.length - 1; i++) {
+    if (/^\d{1,2}:\d{2}$/.test(parts[i]) || /^\d{4}$/.test(parts[i])) {
+      nameIndex = i + 1;
+      break;
+    }
+  }
+
+  let name = parts.slice(nameIndex).join(' ');
+  if (!name) name = parts[parts.length - 1];
+
+  // Strip symlink target for display
+  if (isSymlink && name.includes(' -> ')) {
+    name = name.split(' -> ')[0];
+  }
+
+  if (!name || name === '.' || name === '..') return null;
+
+  const size = parts[4] || '0';
+  const owner = parts[2] || 'root';
+  const date = parts.slice(Math.max(5, nameIndex - 3), nameIndex).join(' ');
+
+  return { name, isDir: isDir || isSymlink, perms, owner, size, date, raw: line };
+}
+
 /* ── GET /api/qa/containers/:id/score ─────────────────────────────────── */
 router.get('/containers/:id/score', async (req, res) => {
   try {
@@ -338,18 +375,20 @@ router.post('/containers/:id/diag', async (req, res) => {
 
 /* ── GET /api/qa/containers/:id/files ─────────────────────────────────── */
 router.get('/containers/:id/files', async (req, res) => {
-  const dirPath = req.query.path || '/app';
+  const dirPath  = req.query.path || '/app';
+  const sortMode = req.query.sort || 'default'; // 'default', 'tr' (time reverse), 'S' (size)
   const container = docker.getContainer(req.params.id);
 
+  let lsFlags = ['-la'];
+  if (sortMode === 'tr') lsFlags = ['-la', '-tr'];
+  if (sortMode === 'S')  lsFlags = ['-la', '-S'];
+
   try {
-    const raw = await execInContainer(container, ['ls', '-la', dirPath]);
-    const lines = raw.split('\n').filter(l => l.trim() && !l.startsWith('total'));
-    const items = lines.map(line => {
-      const parts = line.trim().split(/\s+/);
-      const isDir = parts[0]?.startsWith('d');
-      const name  = parts.slice(8).join(' ');
-      return { name, isDir, raw: line };
-    }).filter(i => i.name && i.name !== '.' && i.name !== '..');
+    const raw = await execInContainer(container, ['ls', ...lsFlags, dirPath]);
+    const lines = raw.split('\n');
+    const items = lines
+      .map(line => parseLsLine(line))
+      .filter(Boolean);
 
     res.json({ path: dirPath, items, raw });
   } catch (err) {
