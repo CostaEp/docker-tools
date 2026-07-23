@@ -1,6 +1,6 @@
 /* ── DockerForge — QA & Debugging Workbench + Quality Scoring Engine ───────
    Endpoints:
-   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + fixes + full YAML
+   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + live telemetry stats + fixes + full YAML
    POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F) + fixes
    POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
@@ -15,8 +15,44 @@ const express = require('express');
 const router  = express.Router();
 const docker  = require('../docker');
 
+/* ── Helper: Fetch Real-Time Container Resource Telemetry ────────────────── */
+async function fetchContainerTelemetry(container) {
+  try {
+    const stats = await container.stats({ stream: false });
+    
+    // RAM Usage
+    const memUsage = stats.memory_stats?.usage || 0;
+    const memMax   = stats.memory_stats?.max_usage || memUsage;
+    const memLimit = stats.memory_stats?.limit || 0;
+
+    const usageMB = Math.round(memUsage / 1024 / 1024);
+    const maxMB   = Math.round(memMax / 1024 / 1024);
+    const limitMB = Math.round(memLimit / 1024 / 1024);
+
+    // Dynamic smart memory recommendation: peak memory + 50% buffer (min 256MB)
+    const recMemMB = Math.max(256, Math.ceil((maxMB || usageMB || 128) * 1.5));
+
+    // CPU Usage calculation
+    const cpuDelta = (stats.cpu_stats?.cpu_usage?.total_usage || 0) - (stats.precpu_stats?.cpu_usage?.total_usage || 0);
+    const sysDelta = (stats.cpu_stats?.system_cpu_usage || 0) - (stats.precpu_stats?.system_cpu_usage || 0);
+    const cpusCount = stats.cpu_stats?.online_cpus || stats.cpu_stats?.cpu_usage?.percpu_usage?.length || 1;
+    const cpuPercent = (sysDelta > 0 && cpuDelta > 0) ? parseFloat(((cpuDelta / sysDelta) * cpusCount * 100).toFixed(1)) : 0.0;
+
+    return {
+      usageMB,
+      maxMB,
+      limitMB,
+      recMemMB,
+      cpuPercent,
+      cpusCount,
+    };
+  } catch (err) {
+    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1 };
+  }
+}
+
 /* ── Generate Full Production-Ready docker-compose.yml ────────────────────── */
-function generateFullComposeYaml(info) {
+function generateFullComposeYaml(info, telemetry) {
   const cName = info.Name?.replace(/^\//, '') || 'app_service';
   const img   = info.Config?.Image || 'ubuntu:latest';
   const hc    = info.HostConfig || {};
@@ -72,8 +108,8 @@ function generateFullComposeYaml(info) {
     });
   }
 
-  // Memory & CPU Limits
-  const memLimit = hc.Memory ? `${Math.round(hc.Memory / 1024 / 1024)}m` : '512m';
+  // Memory & CPU Limits (Dynamic Telemetry-Based)
+  const memLimit = hc.Memory ? `${Math.round(hc.Memory / 1024 / 1024)}m` : `${telemetry.recMemMB}m`;
   const cpuLimit = hc.NanoCpus ? (hc.NanoCpus / 1000000000).toFixed(1) : '1.0';
 
   lines.push(`    mem_limit: ${memLimit}`);
@@ -99,7 +135,7 @@ function generateFullComposeYaml(info) {
 }
 
 /* ── Container Quality Scoring Algorithm ────────────────────────────────── */
-function calculateContainerScore(info) {
+function calculateContainerScore(info, telemetry) {
   let score = 100;
   const deductions = [];
   const bonuses    = [];
@@ -137,21 +173,23 @@ function calculateContainerScore(info) {
     });
   }
 
-  // 2. Memory Limit (15 pts)
+  // 2. Memory Limit (15 pts) — Dynamic Telemetry Based!
   if (!hc.Memory || hc.Memory === 0) {
     score -= 15;
+    const recMB = telemetry.recMemMB;
     deductions.push({
       pts: -15,
       key: 'NO_MEM_LIMIT',
       label: 'No memory limit configured (OOM risk)',
-      recommendation: 'Set a memory limit (e.g., 512MB) to prevent host memory exhaustion.',
+      recommendation: `Real-time monitoring: Usage ${telemetry.usageMB} MB (Peak ${telemetry.maxMB} MB). Recommend setting limit to ${recMB} MB (+50% safety buffer).`,
       fixable: true,
-      fixAction: 'Set 512MB Memory Limit',
-      yamlSnippet: `# Add memory limit to docker-compose.yml:\nmem_limit: 512m\n\n# OR Compose v3 deploy syntax:\ndeploy:\n  resources:\n    limits:\n      memory: 512m`,
+      fixAction: `Set ${recMB}MB Memory Limit`,
+      recMemMB: recMB,
+      yamlSnippet: `# Add telemetry-based memory limit (${recMB}MB) to docker-compose.yml:\nmem_limit: ${recMB}m\n\n# OR Compose v3 deploy syntax:\ndeploy:\n  resources:\n    limits:\n      memory: ${recMB}m`,
     });
   } else {
     const memMB = Math.round(hc.Memory / 1024 / 1024);
-    bonuses.push({ pts: 5, label: `Memory limit configured (${memMB} MB)` });
+    bonuses.push({ pts: 5, label: `Memory limit configured (${memMB} MB, Current Usage: ${telemetry.usageMB} MB)` });
   }
 
   // 3. CPU Limit (10 pts)
@@ -161,13 +199,13 @@ function calculateContainerScore(info) {
       pts: -10,
       key: 'NO_CPU_LIMIT',
       label: 'No CPU limit configured',
-      recommendation: 'Configure CPU allocation (e.g. 1.0 CPU) to prevent CPU starvation.',
+      recommendation: `Real-time load: ${telemetry.cpuPercent}% CPU. Recommend allocating 1.0 CPU limit.`,
       fixable: true,
       fixAction: 'Set 1.0 CPU Limit',
       yamlSnippet: `# Add CPU limit to docker-compose.yml:\ncpus: 1.0\n\n# OR Compose v3 deploy syntax:\ndeploy:\n  resources:\n    limits:\n      cpus: '1.0'`,
     });
   } else {
-    bonuses.push({ pts: 5, label: 'CPU limit configured' });
+    bonuses.push({ pts: 5, label: `CPU limit configured (Live load: ${telemetry.cpuPercent}%)` });
   }
 
   // 4. Privileged Mode (-30 pts)
@@ -391,12 +429,14 @@ router.get('/containers/:id/score', async (req, res) => {
   try {
     const container = docker.getContainer(req.params.id);
     const info      = await container.inspect();
-    const rating    = calculateContainerScore(info);
-    const fullYaml  = generateFullComposeYaml(info);
+    const telemetry = await fetchContainerTelemetry(container);
+    const rating    = calculateContainerScore(info, telemetry);
+    const fullYaml  = generateFullComposeYaml(info, telemetry);
 
     res.json({
       id: req.params.id,
       name: info.Name?.replace('/', ''),
+      telemetry,
       fullComposeYaml: fullYaml,
       ...rating,
     });
@@ -407,13 +447,14 @@ router.get('/containers/:id/score', async (req, res) => {
 
 /* ── POST /api/qa/containers/:id/fix ──────────────────────────────────── */
 router.post('/containers/:id/fix', async (req, res) => {
-  const { fixKey } = req.body;
-  const container  = docker.getContainer(req.params.id);
+  const { fixKey, recMemMB } = req.body;
+  const container = docker.getContainer(req.params.id);
 
   try {
     const updateOpts = {};
     if (fixKey === 'NO_MEM_LIMIT') {
-      updateOpts.Memory = 512 * 1024 * 1024; // 512MB
+      const targetMB = recMemMB || 512;
+      updateOpts.Memory = targetMB * 1024 * 1024;
       updateOpts.MemorySwap = -1;
     } else if (fixKey === 'OOM_KILLED') {
       updateOpts.Memory = 1024 * 1024 * 1024; // 1GB
@@ -427,10 +468,11 @@ router.post('/containers/:id/fix', async (req, res) => {
     }
 
     await container.update(updateOpts);
-    const info = await container.inspect();
-    const newRating = calculateContainerScore(info);
-    const fullYaml  = generateFullComposeYaml(info);
-    res.json({ ok: true, fixKey, newRating, fullComposeYaml: fullYaml });
+    const info      = await container.inspect();
+    const telemetry = await fetchContainerTelemetry(container);
+    const newRating = calculateContainerScore(info, telemetry);
+    const fullYaml  = generateFullComposeYaml(info, telemetry);
+    res.json({ ok: true, fixKey, newRating, telemetry, fullComposeYaml: fullYaml });
   } catch (err) {
     res.status(500).json({ error: `Fix failed: ${err.message}` });
   }

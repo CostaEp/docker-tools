@@ -1,6 +1,8 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
+   - Real-Time Container Resource Telemetry (RAM usage, Peak memory, CPU %)
+   - Smart Dynamic Sizing Recommendation Engine (Peak RAM + 50% safety buffer)
    - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
    - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
@@ -32,7 +34,7 @@ export async function renderQA(container) {
       .score-display-card {
         background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
         border: 1px solid var(--border-bright); border-radius: 14px; padding: 20px;
-        display: flex; align-items: center; gap: 20px; margin-bottom: 16px; position: relative; overflow: hidden;
+        display: flex; align-items: center; gap: 20px; margin-bottom: 14px; position: relative; overflow: hidden;
       }
       
       .score-ring-wrap { position: relative; width: 68px; height: 68px; flex-shrink: 0; }
@@ -49,7 +51,7 @@ export async function renderQA(container) {
       .score-meta-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
       /* Sleek Recommendation Cards */
-      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
+      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 280px; overflow-y: auto; padding-right: 4px; }
       
       .recom-card {
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
@@ -309,11 +311,12 @@ async function loadScore(id) {
   const area = document.getElementById('qa-score-area');
   const copyTopBtn = document.getElementById('btn-copy-top-yaml');
   if (!area) return;
-  area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><i class="ph ph-spinner"></i> Evaluating container quality rating...</div>';
+  area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><i class="ph ph-spinner"></i> Evaluating container quality rating & live telemetry...</div>';
 
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0 };
     currentFullYaml = data.fullComposeYaml || '';
     if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
 
@@ -340,6 +343,24 @@ async function loadScore(id) {
         </div>
       </div>
 
+      <!-- Real-Time Resource Telemetry Card -->
+      <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:800;color:var(--text-muted);text-transform:uppercase;margin-bottom:6px;display:flex;align-items:center;justify-space-between">
+          <span>📊 Live Telemetry Stats</span>
+          <span style="color:var(--accent-start)">REAL-TIME</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;font-family:var(--font-mono)">
+          <div>
+            <div style="color:var(--text-secondary);font-size:10px">RAM Usage / Peak</div>
+            <div style="font-weight:700;color:var(--text-primary)">${t.usageMB} MB <span style="font-size:9.5px;color:var(--text-muted)">(Peak: ${t.maxMB} MB)</span></div>
+          </div>
+          <div>
+            <div style="color:var(--text-secondary);font-size:10px">CPU Load</div>
+            <div style="font-weight:700;color:var(--text-primary)">${t.cpuPercent}%</div>
+          </div>
+        </div>
+      </div>
+
       <div class="recom-list">
         ${data.deductions.map(d => `
           <div class="recom-card deduction">
@@ -350,7 +371,7 @@ async function loadScore(id) {
             ${d.recommendation ? `<div class="recom-desc">💡 ${escapeHtml(d.recommendation)}</div>` : ''}
             <div style="display:flex;gap:6px;margin-top:4px">
               ${d.fixable ? `
-                <button class="btn btn-success btn-sm" onclick="window.qaApplyFix('${d.key}')">
+                <button class="btn btn-success btn-sm" onclick="window.qaApplyFix('${d.key}', ${d.recMemMB || 512})">
                   <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Live Fix')}
                 </button>
               ` : ''}
@@ -435,7 +456,7 @@ function renderModalContent() {
   if (item && item.fixable) {
     applyBtn.style.display = '';
     applyBtn.onclick = async () => {
-      await qaApplyFix(item.key);
+      await qaApplyFix(item.key, item.recMemMB);
       qaCloseModal();
     };
   } else {
@@ -448,11 +469,11 @@ function qaCloseModal() {
 }
 
 /* ── 1-Click Apply Live Fix ──────────────────────────────────────────────── */
-async function qaApplyFix(fixKey) {
+async function qaApplyFix(fixKey, recMemMB) {
   if (!selectedContainerId) return;
   try {
     toast('⚡ Applying live container update...', 'info');
-    const res = await api.qa.applyFix(selectedContainerId, fixKey);
+    const res = await api.qa.applyFix(selectedContainerId, fixKey, recMemMB);
     if (res.ok) {
       toast('✅ Fix applied successfully!', 'success');
       await loadScore(selectedContainerId);
