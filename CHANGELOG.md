@@ -7,9 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-07-23 — Container QA Workbench, Telemetry & File Permissions Release
+
+### 🚀 Added
+- **Container QA & Debugging Workbench (`#qa`)**:
+  - Real-time container Quality Scorecard & Letter Grade (0–100, Grade **A–F**) evaluating security, memory, CPU, healthcheck, UID 0, restart policy, and crash status.
+  - **1-Click Live Fix Engine**: Dynamically update memory limits (`mem_limit`), CPU limits (`cpus`), and restart policies on running containers without recreation.
+  - **Full Production `docker-compose.yml` Exporter**: Reverse-engineer complete Compose specification files for any container with 1-click clipboard copy.
+  - **1-Click Diagnostics Workbench**: Instant execution of `df -h`, `free -m`, `ports` (`netstat`), `ps aux`, `env`, and `ping` inside containers.
+- **Real-Time Resource Telemetry & Live Sparklines**:
+  - Live SVG Sparkline Charts with a 3-second auto-polling loop tracking RAM memory usage, Peak memory, CPU load %, and Storage space.
+  - **Smart Dynamic Memory Buffer**: Calculates peak RAM usage + 50% safety buffer for recommended memory limit allocations.
+  - **Storage & Volume Telemetry**: Displays Container Writable Layer size (`SizeRw`), Host Disk Space (Used/Free/Total with progress bar), and Mounted Volume storage.
+- **Live Container File Explorer & Permissions Manager (`chmod` / `chown`)**:
+  - **Colorized Perms & Warning Badges**: Pulsing red warning badges (`⚠️ 777`) for world-writable files, green exec badges (`⚡`), amber config badges (`🔒`), cyan folder badges (`📁`).
+  - **Interactive `chmod` & `chown` Controls**: Per-row permission changes (`chmod 755/644/777`) and ownership changes (`chown user:group`) inside running containers.
+  - **Live Path & File Autocomplete**: Floating glassmorphic autocomplete dropdown supporting **Tab**, Arrow keys, Enter, and Click selection for container files and folders.
+  - **UTF-8 & Base64 In-Place Editor**: Read and edit any text/code/config file (`js`, `html`, `css`, `json`, `yaml`, `sh`, `env`, `conf`, `py`, `go`, `md`, `hosts`) with full font and character encoding support.
+  - **Expanded Roomy View**: Max-height 600px for file tree table and min-height 480px for editor textarea.
+
+### 🐛 Fixed
+- **[BUG-009]**: Fixed `parseLsLine` 4-digit size date matching index bug where `4096` matched `timeIdx`, extracting invalid paths (`/app/Jul 23 19:51 frontend`).
+- **[BUG-010]**: Fixed double path concatenation in file explorer input (`/etc/hosts//etc/hosts`).
+- **[BUG-011]**: Implemented custom Docker binary stream demuxer (`execInContainer`), parsing 8-byte frame length headers (`readUInt32BE(4)`) to eliminate base64 corruption and garbled text (`q\j{h...`).
+- **[BUG-012]**: Overhauled QA Workbench page to a 100% full-width single-column vertical stack layout, resolving 2-column scorecard text truncation.
+
+---
+
 ## [2.0.0] - 2026-07-22 — Drag-and-Drop Compose Builder Release
 
-### Added
+### 🚀 Added
 - **Visual Drag-and-Drop Compose Builder**:
   - Interactive SVG + HTML node canvas for visually designing multi-container stacks.
   - Interactive service node creation, bezier curve link connections, drag positioning, node selection, and deletion.
@@ -23,7 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Dynamic local image selector dropdown populated from host Docker engine.
   - Drag-and-drop / file upload modal for loading offline `.tar.gz` and `.tar` container image archives directly into Docker engine via raw stream pipeline (`POST /api/images/load`).
 
-### Fixed
+### 🐛 Fixed
 - **GateScanner Compliance**: Stripped all non-Linux prebuilt binaries (`win32-*`, `darwin-*`, `android-*`, `ios-*`) in `Dockerfile` and `package-release.sh` to eliminate false-positive AV detections (`TRW64.Evo`).
 - **Modal Display**: Replaced `.hidden` CSS class toggling with inline `style.display = 'flex'` / `'none'` across all modals.
 - **Frontend Syntax**: Removed duplicate function declaration in `compose.js`.
@@ -32,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.0] - 2026-07-21 — Security Audit Engine Release
 
-### Added
+### 🚀 Added
 - **Container Security Auditor**:
   - 11 automated offline container misconfiguration & privilege checks (privileged mode, root UID execution, docker socket exposure, sensitive host mounts, memory/CPU limits, dangerous Linux capabilities, host network/PID namespace sharing, missing healthchecks, missing restart policies).
   - Risk score calculation (0–100) and letter grades (**A–F**).
@@ -42,7 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-07-22 — Specification Exporter & Helm Chart Release
 
-### Added
+### 🚀 Added
 - **Container Build Specification Exporter**:
   - Reverse-engineer container inspection metadata into valid `docker-compose.yml` service definitions.
   - Reconstruct `Dockerfile` directives (`FROM`, `USER`, `WORKDIR`, `ENV`, `EXPOSE`, `VOLUME`, `ENTRYPOINT`, `CMD`).
@@ -57,7 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.0.0] - 2026-07-21 — Production Release (Air-Gapped Enterprise Edition)
 
-### Added
+### 🚀 Added
 - **Dashboard**: Live real-time statistics cards for containers, images, volumes, and networks with CPU & Memory utilization bars.
 - **Container Management**: Full CRUD & lifecycle controls (Start, Stop, Restart, Pause, Unpause, Kill, Remove, Rename).
 - **Run Container Modal**: Dynamic form with auto-populated local images dropdown, port mappings, volume mounts, environment variables, restart policies, and memory limits.
@@ -70,6 +97,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Disk Cleanup Page**: One-click system prune tool for stopped containers, dangling images, unused volumes, and networks with disk space recovery logs.
 - **Air-Gapped Standalone Release**: 100% vendor-bundled assets (`/frontend/vendor/`), offline image export (`.tar`), and RHEL 9 Podman/Docker startup script.
 
-### Security
+### 🔒 Security
 - Audited all 166 npm production dependencies (0 Critical CVEs, 0 High CVEs).
 - Software Bill of Materials (`SBOM.json` & `SBOM.md`) generated.
