@@ -121,6 +121,16 @@ export const api = {
     rollout:        (name, ns)  => request('GET',    `/api/k8s/rollout/${name}?namespace=${ns}`),
     deleteResource: (kind, name, ns) => request('DELETE', `/api/k8s/resources/${kind}/${name}?namespace=${ns}`),
   },
+
+  // ── QA & Container Debugging Workbench ────────────────────────────
+  qa: {
+    containerScore: (id)        => request('GET',    `/api/qa/containers/${id}/score`),
+    composeScore:   (yaml)      => request('POST',   '/api/qa/compose/score', { yaml }),
+    diagCmd:        (id, action, target) => request('POST', `/api/qa/containers/${id}/diag`, { action, target }),
+    listFiles:      (id, path)  => request('GET',    `/api/qa/containers/${id}/files?path=${encodeURIComponent(path || '/app')}`),
+    readFile:       (id, path)  => request('POST',   `/api/qa/containers/${id}/read`, { path }),
+    writeFile:      (id, path, content) => request('POST', `/api/qa/containers/${id}/write`, { path, content }),
+  },
 };
 
 export default api;

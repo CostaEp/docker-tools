@@ -30,6 +30,7 @@ const statsRouter = require('./routes/stats');
 const securityRouter = require('./routes/security');
 const composeRouter  = require('./routes/compose');
 const k8sRouter      = require('./routes/k8s');
+const qaRouter       = require('./routes/qa');
 
 app.use('/api/containers', containersRouter);
 app.use('/api/images', imagesRouter);
@@ -39,6 +40,7 @@ app.use('/api/stats', statsRouter);
 app.use('/api/security', securityRouter);
 app.use('/api/compose',  composeRouter);
 app.use('/api/k8s',      k8sRouter);
+app.use('/api/qa',       qaRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {

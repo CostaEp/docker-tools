@@ -107,8 +107,9 @@ export async function renderCompose(container) {
             display:flex;align-items:center;justify-content:space-between;
             cursor:pointer;user-select:none;
           " id="yaml-toggle">
-            <span style="font-size:12px;font-weight:600;color:var(--text-secondary);">
+            <span style="font-size:12px;font-weight:600;color:var(--text-secondary);display:flex;align-items:center;gap:6px;">
               <i class="ph ph-code"></i> docker-compose.yml
+              <span id="compose-stack-score-badge" style="display:none;font-size:10px;font-weight:800;padding:1px 6px;border-radius:10px;background:var(--bg-hover);" title="Stack Quality Score"></span>
             </span>
             <div style="display:flex;gap:6px;">
               <button class="btn btn-secondary btn-sm" id="yaml-copy-btn" style="font-size:10px;padding:2px 8px;">
@@ -1075,9 +1076,26 @@ function generateYaml() {
   return yaml;
 }
 
-function updateYaml() {
+async function updateYaml() {
+  const yamlStr = generateYaml();
   const el = document.getElementById('compose-yaml');
-  if (el) el.textContent = generateYaml();
+  if (el) el.textContent = yamlStr;
+
+  const scoreBadge = document.getElementById('compose-stack-score-badge');
+  if (scoreBadge && nodes.length > 0) {
+    try {
+      const res = await api.qa.composeScore(yamlStr);
+      scoreBadge.style.display = 'inline-flex';
+      const color = res.grade === 'A' ? '#00c873' : res.grade === 'B' ? '#00c6ff' : res.grade === 'C' ? '#ffd600' : '#ff5252';
+      scoreBadge.style.color = color;
+      scoreBadge.style.border = `1px solid ${color}40`;
+      scoreBadge.style.background = `${color}15`;
+      scoreBadge.innerHTML = `<span>Grade ${res.grade} (${res.score})</span>`;
+      scoreBadge.title = (res.deductions || []).map(d => `${d.label} (${d.pts})`).join('\n') || 'All checks passed!';
+    } catch (_) {}
+  } else if (scoreBadge) {
+    scoreBadge.style.display = 'none';
+  }
 }
 
 /* ── Modals ──────────────────────────────────────────────────────────────── */
