@@ -108,6 +108,19 @@ export const api = {
     deploy:  (yaml) => request('POST', '/api/compose/deploy', { yaml }),
     running: ()     => request('GET',  '/api/compose/running'),
   },
+
+  // ── Kubernetes Direct Deployment ──────────────────────────────────
+  k8s: {
+    config:         ()          => request('GET',    '/api/k8s/config'),
+    setConfig:      (body)      => request('POST',   '/api/k8s/config', body),
+    namespaces:     ()          => request('GET',    '/api/k8s/namespaces'),
+    resources:      (ns)        => request('GET',    `/api/k8s/resources?namespace=${ns}`),
+    pods:           (ns)        => request('GET',    `/api/k8s/pods?namespace=${ns}`),
+    deploy:         (body)      => request('POST',   '/api/k8s/deploy', body),
+    manifest:       (body)      => request('POST',   '/api/k8s/manifest', body),
+    rollout:        (name, ns)  => request('GET',    `/api/k8s/rollout/${name}?namespace=${ns}`),
+    deleteResource: (kind, name, ns) => request('DELETE', `/api/k8s/resources/${kind}/${name}?namespace=${ns}`),
+  },
 };
 
 export default api;

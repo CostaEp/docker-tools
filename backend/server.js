@@ -29,6 +29,7 @@ const volumesRouter = require('./routes/volumes');
 const statsRouter = require('./routes/stats');
 const securityRouter = require('./routes/security');
 const composeRouter  = require('./routes/compose');
+const k8sRouter      = require('./routes/k8s');
 
 app.use('/api/containers', containersRouter);
 app.use('/api/images', imagesRouter);
@@ -37,10 +38,11 @@ app.use('/api/volumes', volumesRouter);
 app.use('/api/stats', statsRouter);
 app.use('/api/security', securityRouter);
 app.use('/api/compose',  composeRouter);
+app.use('/api/k8s',      k8sRouter);
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', version: '1.2.0', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: '2.2.0', timestamp: new Date().toISOString() });
 });
 
 // Docker info

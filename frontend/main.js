@@ -13,6 +13,7 @@ import { renderHealth } from '/pages/health.js';
 import { renderCleanup } from '/pages/cleanup.js';
 import { renderSecurity } from '/pages/security.js';
 import { renderCompose } from '/pages/compose.js';
+import { renderK8s } from '/pages/k8s.js';
 import api from '/api.js';
 import toast from '/toast.js';
 
@@ -92,7 +93,8 @@ const PAGE_TITLES = {
   health: 'System Health',
   cleanup: 'Disk Cleanup',
   security: 'Security Audit',
-  compose: 'Compose Builder',
+  compose:  'Compose Builder',
+  k8s:      'Kubernetes',
 };
 
 function getCurrentPage() {
@@ -142,6 +144,7 @@ async function loadPage(page, subId = null) {
     case 'cleanup':    await renderCleanup(content); break;
     case 'security':   await renderSecurity(content); break;
     case 'compose':    await renderCompose(content); break;
+    case 'k8s':        await renderK8s(content); break;
     case 'terminal':
       // Terminal page needs full height, no padding
       content.style.padding = '0';
