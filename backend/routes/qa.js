@@ -1,6 +1,6 @@
 /* ── DockerForge — QA & Debugging Workbench + Quality Scoring Engine ───────
    Endpoints:
-   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + fixes
+   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + fixes + full YAML
    POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F) + fixes
    POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
@@ -14,6 +14,89 @@
 const express = require('express');
 const router  = express.Router();
 const docker  = require('../docker');
+
+/* ── Generate Full Production-Ready docker-compose.yml ────────────────────── */
+function generateFullComposeYaml(info) {
+  const cName = info.Name?.replace(/^\//, '') || 'app_service';
+  const img   = info.Config?.Image || 'ubuntu:latest';
+  const hc    = info.HostConfig || {};
+  const cfg   = info.Config || {};
+
+  const lines = [
+    `version: '3.8'`,
+    ``,
+    `services:`,
+    `  ${cName}:`,
+    `    image: ${img}`,
+    `    container_name: ${cName}`,
+  ];
+
+  // Restart Policy
+  const rp = hc.RestartPolicy?.Name;
+  lines.push(`    restart: ${rp && rp !== 'no' ? rp : 'unless-stopped'}`);
+
+  // User
+  lines.push(`    user: "${cfg.User && cfg.User !== 'root' ? cfg.User : '1001:1001'}"`);
+
+  // Environment variables
+  if (cfg.Env && cfg.Env.length > 0) {
+    const validEnvs = cfg.Env.filter(e => !e.startsWith('PATH=') && !e.startsWith('NODE_VERSION=') && !e.startsWith('TERM='));
+    if (validEnvs.length > 0) {
+      lines.push(`    environment:`);
+      validEnvs.slice(0, 10).forEach(e => {
+        lines.push(`      - ${e}`);
+      });
+    }
+  }
+
+  // Ports
+  const portBindings = hc.PortBindings || {};
+  const portLines = [];
+  for (const [containerPort, bindings] of Object.entries(portBindings)) {
+    if (bindings && bindings.length > 0) {
+      const hostPort = bindings[0].HostPort;
+      portLines.push(`      - "${hostPort}:${containerPort.replace('/tcp', '')}"`);
+    }
+  }
+  if (portLines.length > 0) {
+    lines.push(`    ports:`);
+    lines.push(...portLines);
+  }
+
+  // Mounts / Volumes
+  const mounts = info.Mounts || [];
+  if (mounts.length > 0) {
+    lines.push(`    volumes:`);
+    mounts.forEach(m => {
+      lines.push(`      - ${m.Source}:${m.Destination}${m.Mode ? `:${m.Mode}` : ''}`);
+    });
+  }
+
+  // Memory & CPU Limits
+  const memLimit = hc.Memory ? `${Math.round(hc.Memory / 1024 / 1024)}m` : '512m';
+  const cpuLimit = hc.NanoCpus ? (hc.NanoCpus / 1000000000).toFixed(1) : '1.0';
+
+  lines.push(`    mem_limit: ${memLimit}`);
+  lines.push(`    cpus: ${cpuLimit}`);
+
+  // Healthcheck
+  const hcTest = cfg.Healthcheck?.Test;
+  if (hcTest && hcTest.length > 0 && hcTest[0] !== 'NONE') {
+    lines.push(`    healthcheck:`);
+    lines.push(`      test: ${JSON.stringify(hcTest)}`);
+    lines.push(`      interval: ${Math.round((cfg.Healthcheck.Interval || 30000000000) / 1e9)}s`);
+    lines.push(`      timeout: ${Math.round((cfg.Healthcheck.Timeout || 10000000000) / 1e9)}s`);
+    lines.push(`      retries: ${cfg.Healthcheck.Retries || 3}`);
+  } else {
+    lines.push(`    healthcheck:`);
+    lines.push(`      test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]`);
+    lines.push(`      interval: 30s`);
+    lines.push(`      timeout: 10s`);
+    lines.push(`      retries: 3`);
+  }
+
+  return lines.join('\n');
+}
 
 /* ── Container Quality Scoring Algorithm ────────────────────────────────── */
 function calculateContainerScore(info) {
@@ -277,7 +360,6 @@ function parseLsLine(line) {
   const isDir     = perms.startsWith('d');
   const isSymlink = perms.startsWith('l');
 
-  // Find HH:MM or YYYY pattern starting from index 5
   let timeIdx = -1;
   for (let i = 5; i < parts.length - 1; i++) {
     if (/^\d{1,2}:\d{2}$/.test(parts[i]) || (/^\d{4}$/.test(parts[i]) && i >= 6)) {
@@ -310,7 +392,14 @@ router.get('/containers/:id/score', async (req, res) => {
     const container = docker.getContainer(req.params.id);
     const info      = await container.inspect();
     const rating    = calculateContainerScore(info);
-    res.json({ id: req.params.id, name: info.Name?.replace('/', ''), ...rating });
+    const fullYaml  = generateFullComposeYaml(info);
+
+    res.json({
+      id: req.params.id,
+      name: info.Name?.replace('/', ''),
+      fullComposeYaml: fullYaml,
+      ...rating,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -340,7 +429,8 @@ router.post('/containers/:id/fix', async (req, res) => {
     await container.update(updateOpts);
     const info = await container.inspect();
     const newRating = calculateContainerScore(info);
-    res.json({ ok: true, fixKey, newRating });
+    const fullYaml  = generateFullComposeYaml(info);
+    res.json({ ok: true, fixKey, newRating, fullComposeYaml: fullYaml });
   } catch (err) {
     res.status(500).json({ error: `Fix failed: ${err.message}` });
   }

@@ -1,6 +1,7 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
+   - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
    - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
    - Container File Explorer with chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
@@ -16,6 +17,9 @@ let currentViewMode = 'table'; // 'table' or 'raw'
 let rawLsOutput = '';
 let fetchedItems = [];
 let currentDeductionsMap = {};
+let currentFullYaml = '';
+let activeModalTab = 'full'; // 'full' or 'fix'
+let currentActiveFixKey = null;
 
 export async function renderQA(container) {
   container.innerHTML = `
@@ -45,7 +49,7 @@ export async function renderQA(container) {
       .score-meta-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
 
       /* Sleek Recommendation Cards */
-      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
+      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto; padding-right: 4px; }
       
       .recom-card {
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
@@ -114,25 +118,34 @@ export async function renderQA(container) {
 
       /* YAML Snippet Modal */
       .qa-modal-overlay { position:fixed; inset:0; background:#00000080; backdrop-filter:blur(4px); z-index:1000; display:none; align-items:center; justify-content:center; }
-      .qa-modal-box { background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:16px; width:520px; max-width:94vw; padding:24px; box-shadow:var(--shadow-lg); }
+      .qa-modal-box { background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:16px; width:640px; max-width:94vw; padding:24px; box-shadow:var(--shadow-lg); }
+
+      .modal-tab-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
+      .modal-tab-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
     </style>
 
-    <!-- Fix Preview & YAML Modal -->
+    <!-- Fix Preview & Full YAML Modal -->
     <div class="qa-modal-overlay" id="qa-fix-modal">
       <div class="qa-modal-box">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <span style="font-size:15px;font-weight:700;color:var(--text-primary)" id="qa-modal-title">📄 Fix & YAML Snippet Preview</span>
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary)" id="qa-modal-title">📄 docker-compose.yml Generator & Fix</span>
           <button class="icon-btn" onclick="window.qaCloseModal()">✕</button>
         </div>
 
-        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;" id="qa-modal-desc">
-          How this update is applied:
+        <!-- Modal Tabs -->
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button class="modal-tab-btn active" id="modal-tab-full" onclick="window.qaSwitchModalTab('full')">📋 Full docker-compose.yml (Copy All)</button>
+          <button class="modal-tab-btn" id="modal-tab-fix" onclick="window.qaSwitchModalTab('fix')">⚡ Specific Fix Snippet</button>
         </div>
 
-        <div style="background:#070a10;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:#e6edf3;white-space:pre-wrap;margin-bottom:16px;" id="qa-modal-snippet"></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;" id="qa-modal-desc">
+          Complete production-ready docker-compose.yml for this container with all recommendations applied:
+        </div>
+
+        <div style="background:#050811;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--font-mono);font-size:11.5px;line-height:1.6;color:#e6edf3;white-space:pre;max-height:300px;overflow:auto;margin-bottom:16px;" id="qa-modal-snippet"></div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end">
-          <button class="btn btn-secondary btn-sm" id="qa-copy-snippet-btn"><i class="ph ph-copy"></i> Copy YAML</button>
+          <button class="btn btn-secondary btn-sm" id="qa-copy-snippet-btn"><i class="ph ph-copy"></i> Copy Full YAML</button>
           <button class="btn btn-primary btn-sm" id="qa-apply-modal-fix-btn"><i class="ph ph-lightning"></i> Apply Live Fix to Container</button>
         </div>
       </div>
@@ -156,7 +169,12 @@ export async function renderQA(container) {
 
         <!-- Redesigned Scorecard Card -->
         <div class="qa-card" id="qa-score-card">
-          <div class="qa-card-title"><i class="ph ph-shield-check"></i> Quality & Health Rating</div>
+          <div class="qa-card-title" style="justify-content:space-between">
+            <span><i class="ph ph-shield-check"></i> Quality & Health Rating</span>
+            <button class="btn btn-secondary btn-sm" id="btn-copy-top-yaml" style="display:none;font-size:11px;padding:4px 8px" onclick="window.qaShowFullYamlModal()">
+              <i class="ph ph-file-code"></i> Copy Full docker-compose.yml
+            </button>
+          </div>
           <div id="qa-score-area">
             <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Select a container to inspect quality rating and recommendations.</div>
           </div>
@@ -251,7 +269,9 @@ export async function renderQA(container) {
   window.qaChmod             = qaChmod;
   window.qaChown             = qaChown;
   window.qaShowFixModal      = qaShowFixModal;
+  window.qaShowFullYamlModal = qaShowFullYamlModal;
   window.qaCloseModal        = qaCloseModal;
+  window.qaSwitchModalTab    = qaSwitchModalTab;
 
   // Load container list
   try {
@@ -287,12 +307,16 @@ async function qaOnSelectContainer(id) {
 /* ── Load Redesigned Scorecard ────────────────────────────────────────────── */
 async function loadScore(id) {
   const area = document.getElementById('qa-score-area');
+  const copyTopBtn = document.getElementById('btn-copy-top-yaml');
   if (!area) return;
   area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><i class="ph ph-spinner"></i> Evaluating container quality rating...</div>';
 
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
+    currentFullYaml = data.fullComposeYaml || '';
+    if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
+
     currentDeductionsMap = {};
     (data.deductions || []).forEach(d => { currentDeductionsMap[d.key] = d; });
 
@@ -330,11 +354,9 @@ async function loadScore(id) {
                   <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Live Fix')}
                 </button>
               ` : ''}
-              ${d.yamlSnippet ? `
-                <button class="btn btn-secondary btn-sm" onclick="window.qaShowFixModal('${d.key}')">
-                  <i class="ph ph-code"></i> View YAML Snippet
-                </button>
-              ` : ''}
+              <button class="btn btn-secondary btn-sm" onclick="window.qaShowFixModal('${d.key}')">
+                <i class="ph ph-code"></i> View YAML Snippet
+              </button>
             </div>
           </div>
         `).join('')}
@@ -356,35 +378,61 @@ async function loadScore(id) {
   }
 }
 
+/* ── Show Modal for Top Copy YAML ────────────────────────────────────────── */
+function qaShowFullYamlModal() {
+  currentActiveFixKey = null;
+  qaShowFixModal(null);
+}
+
 /* ── Show YAML Snippet & Fix Modal ───────────────────────────────────────── */
 function qaShowFixModal(key) {
-  const item = currentDeductionsMap[key];
-  if (!item) return;
+  currentActiveFixKey = key;
+  activeModalTab = 'full';
+  renderModalContent();
+  document.getElementById('qa-fix-modal').style.display = 'flex';
+}
 
-  const modal = document.getElementById('qa-fix-modal');
+function qaSwitchModalTab(tab) {
+  activeModalTab = tab;
+  renderModalContent();
+}
+
+function renderModalContent() {
+  const item = currentActiveFixKey ? currentDeductionsMap[currentActiveFixKey] : null;
   const title = document.getElementById('qa-modal-title');
   const desc  = document.getElementById('qa-modal-desc');
   const snippet = document.getElementById('qa-modal-snippet');
   const applyBtn = document.getElementById('qa-apply-modal-fix-btn');
   const copyBtn  = document.getElementById('qa-copy-snippet-btn');
+  const tabFull  = document.getElementById('modal-tab-full');
+  const tabFix   = document.getElementById('modal-tab-fix');
 
-  title.textContent = `⚡ Fix: ${item.label}`;
-  desc.innerHTML = `
-    <b>💡 Recommendation:</b> ${escapeHtml(item.recommendation || '')}<br>
-    <span style="color:var(--accent-start);font-size:11px">
-      • <b>Live Update:</b> Applies cgroup memory/cpu/restart limits directly to kernel via Docker Engine without container restart.<br>
-      • <b>YAML Update:</b> Add the code below to your <code>docker-compose.yml</code> file to persist across container rebuilds.
-    </span>
-  `;
+  tabFull?.classList.toggle('active', activeModalTab === 'full');
+  tabFix?.classList.toggle('active', activeModalTab === 'fix');
 
-  snippet.textContent = item.yamlSnippet || '# No YAML snippet available';
+  if (activeModalTab === 'full') {
+    title.textContent = `📋 Complete Production-Ready docker-compose.yml`;
+    desc.innerHTML = `Full <b>docker-compose.yml</b> specification for this container with all healthchecks, memory limits, and security settings pre-applied:`;
+    snippet.textContent = currentFullYaml || '# Generating docker-compose.yml...';
+    
+    copyBtn.innerHTML = `<i class="ph ph-copy"></i> Copy Complete docker-compose.yml`;
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(currentFullYaml);
+      toast('Copied full docker-compose.yml to clipboard!', 'success');
+    };
+  } else {
+    title.textContent = item ? `⚡ Fix: ${item.label}` : `⚡ Specific Fix Snippet`;
+    desc.innerHTML = item ? `💡 <b>Recommendation:</b> ${escapeHtml(item.recommendation)}` : `Specific YAML snippet for this fix:`;
+    snippet.textContent = item?.yamlSnippet || `# Add snippet to docker-compose.yml`;
 
-  copyBtn.onclick = () => {
-    navigator.clipboard.writeText(item.yamlSnippet || '');
-    toast('Copied YAML snippet to clipboard!', 'success');
-  };
+    copyBtn.innerHTML = `<i class="ph ph-copy"></i> Copy Fix Snippet`;
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(item?.yamlSnippet || '');
+      toast('Copied fix snippet to clipboard!', 'success');
+    };
+  }
 
-  if (item.fixable) {
+  if (item && item.fixable) {
     applyBtn.style.display = '';
     applyBtn.onclick = async () => {
       await qaApplyFix(item.key);
@@ -393,8 +441,6 @@ function qaShowFixModal(key) {
   } else {
     applyBtn.style.display = 'none';
   }
-
-  modal.style.display = 'flex';
 }
 
 function qaCloseModal() {
