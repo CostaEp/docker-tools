@@ -8,21 +8,22 @@ RUN apk add --no-cache \
 
 WORKDIR /app
 
-# Copy backend package files and install, then strip non-Linux prebuilt binaries
+# Copy backend package files and install, then strip non-Linux prebuilt binaries & npm cache.
 # Prevents AV false-positive detections (e.g. GateScanner TRW64.Evo) caused by
 # Windows/macOS PE executables bundled inside npm packages (bare-url, bare-path,
 # bare-fs, node-pty, etc.). Only Linux prebuilds are required on RHEL9 / Alpine.
 COPY backend/package*.json ./backend/
 RUN cd backend && npm install --production && \
-    echo "🔒 Stripping non-Linux prebuilt binaries to pass AV scanning..." && \
+    npm cache clean --force && \
+    rm -rf /root/.npm /root/.cache /tmp/* && \
+    echo "🔒 Stripping non-Linux prebuilt binaries, .bare, .exe, .dll to pass GateScanner AV scanning..." && \
     find ./backend/node_modules -type d \( \
-        -name "win32-x64"   -o -name "win32-arm64"  -o -name "win32-ia32"  \
-        -o -name "darwin-x64" -o -name "darwin-arm64" \
-        -o -name "android-arm" -o -name "android-arm64" \
-        -o -name "android-ia32" -o -name "android-x64" \
-        -o -name "ios-arm64-simulator" -o -name "ios-x64-simulator" \
+        -name "win32*" -o -name "darwin*" -o -name "android*" -o -name "ios*" \
     \) -exec rm -rf {} + 2>/dev/null || true && \
-    echo "✅ Non-Linux prebuilt binaries removed"
+    find ./backend/node_modules -type f \( \
+        -name "*.bare" -o -name "*.exe" -o -name "*.dll" -o -name "*.dylib" \
+    \) -exec rm -rf {} + 2>/dev/null || true && \
+    echo "✅ Non-Linux prebuilt binaries and npm cache thoroughly purged"
 
 # Copy all source files
 COPY backend/ ./backend/
