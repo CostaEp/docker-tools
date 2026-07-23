@@ -39,6 +39,7 @@ function calculateContainerScore(info) {
         label: 'Container healthcheck failing (Unhealthy)',
         recommendation: 'Check application logs or adjust healthcheck test command/interval.',
         fixable: false,
+        yamlSnippet: `# Fix failing healthcheck in docker-compose.yml:\nhealthcheck:\n  test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]\n  interval: 30s\n  timeout: 10s\n  retries: 3`,
       });
     }
   } else {
@@ -49,6 +50,7 @@ function calculateContainerScore(info) {
       label: 'No HEALTHCHECK defined',
       recommendation: 'Add a healthcheck command to monitor container responsiveness.',
       fixable: false,
+      yamlSnippet: `# Add healthcheck to docker-compose.yml:\nhealthcheck:\n  test: ["CMD-SHELL", "curl -f http://localhost/ || exit 1"]\n  interval: 30s\n  timeout: 10s\n  retries: 3\n  start_period: 40s`,
     });
   }
 
@@ -62,6 +64,7 @@ function calculateContainerScore(info) {
       recommendation: 'Set a memory limit (e.g., 512MB) to prevent host memory exhaustion.',
       fixable: true,
       fixAction: 'Set 512MB Memory Limit',
+      yamlSnippet: `# Add memory limit to docker-compose.yml:\nmem_limit: 512m\n\n# OR Compose v3 deploy syntax:\ndeploy:\n  resources:\n    limits:\n      memory: 512m`,
     });
   } else {
     const memMB = Math.round(hc.Memory / 1024 / 1024);
@@ -78,6 +81,7 @@ function calculateContainerScore(info) {
       recommendation: 'Configure CPU allocation (e.g. 1.0 CPU) to prevent CPU starvation.',
       fixable: true,
       fixAction: 'Set 1.0 CPU Limit',
+      yamlSnippet: `# Add CPU limit to docker-compose.yml:\ncpus: 1.0\n\n# OR Compose v3 deploy syntax:\ndeploy:\n  resources:\n    limits:\n      cpus: '1.0'`,
     });
   } else {
     bonuses.push({ pts: 5, label: 'CPU limit configured' });
@@ -92,6 +96,7 @@ function calculateContainerScore(info) {
       label: 'Privileged mode enabled (High security risk)',
       recommendation: 'Disable --privileged flag and add specific Linux capabilities (--cap-add).',
       fixable: false,
+      yamlSnippet: `# Remove privileged: true and add required capabilities:\n# privileged: true (DELETE THIS)\ncap_add:\n  - NET_ADMIN\n  - SYS_PTRACE`,
     });
   }
 
@@ -105,6 +110,7 @@ function calculateContainerScore(info) {
       label: 'Process executing as Root user (UID 0)',
       recommendation: 'Set a non-root USER instruction in Dockerfile (e.g. USER node / 1001).',
       fixable: false,
+      yamlSnippet: `# Specify non-root user in docker-compose.yml:\nuser: "1001:1001"\n\n# OR in Dockerfile:\nUSER node`,
     });
   } else {
     bonuses.push({ pts: 5, label: `Running as non-root user (${user})` });
@@ -121,6 +127,7 @@ function calculateContainerScore(info) {
       recommendation: 'Set restart policy to "unless-stopped" for automatic crash recovery.',
       fixable: true,
       fixAction: 'Set "unless-stopped" Restart Policy',
+      yamlSnippet: `# Add restart policy in docker-compose.yml:\nrestart: unless-stopped`,
     });
   } else if (rp === 'unless-stopped' || rp === 'on-failure') {
     bonuses.push({ pts: 5, label: `Resilient restart policy ("${rp}")` });
@@ -135,6 +142,7 @@ function calculateContainerScore(info) {
       label: `Container exited with error code ${state.ExitCode}`,
       recommendation: 'Inspect container logs to diagnose and fix application runtime crashes.',
       fixable: false,
+      yamlSnippet: `# Check logs and ensure command is not terminating immediately:\ncommand: ["node", "server.js"]`,
     });
   }
   if (state.OOMKilled) {
@@ -146,6 +154,7 @@ function calculateContainerScore(info) {
       recommendation: 'Increase container memory limit or optimize application memory footprint.',
       fixable: true,
       fixAction: 'Increase RAM to 1GB',
+      yamlSnippet: `# Increase memory limit in docker-compose.yml:\nmem_limit: 1024m`,
     });
   }
 
@@ -188,7 +197,7 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 1. Service memory limits
   if (totalMemLimits === 0) {
     score -= 20;
-    deductions.push({ pts: -20, label: 'No services have memory limits configured', recommendation: 'Add mem_limit: 512m to services.' });
+    deductions.push({ pts: -20, label: 'No services have memory limits configured', recommendation: 'Add mem_limit: 512m to services.', yamlSnippet: `mem_limit: 512m` });
   } else if (totalMemLimits === svcKeys.length) {
     bonuses.push({ pts: 10, label: 'All services have memory limits configured' });
   }
@@ -196,7 +205,7 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 2. Healthchecks
   if (totalHc === 0) {
     score -= 15;
-    deductions.push({ pts: -15, label: 'No healthchecks defined across stack', recommendation: 'Add healthcheck block to critical services.' });
+    deductions.push({ pts: -15, label: 'No healthchecks defined across stack', recommendation: 'Add healthcheck block to critical services.', yamlSnippet: `healthcheck:\n  test: ["CMD", "curl", "-f", "http://localhost/"]` });
   } else if (totalHc === svcKeys.length) {
     bonuses.push({ pts: 10, label: 'All services have healthchecks configured' });
   }
@@ -204,7 +213,7 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 3. Restart Policies
   if (totalRestart === 0) {
     score -= 15;
-    deductions.push({ pts: -15, label: 'No restart policies configured', recommendation: 'Add restart: unless-stopped to services.' });
+    deductions.push({ pts: -15, label: 'No restart policies configured', recommendation: 'Add restart: unless-stopped to services.', yamlSnippet: `restart: unless-stopped` });
   }
 
   // 4. Privileged Mode
@@ -383,7 +392,7 @@ router.post('/containers/:id/diag', async (req, res) => {
 /* ── GET /api/qa/containers/:id/files ─────────────────────────────────── */
 router.get('/containers/:id/files', async (req, res) => {
   const dirPath  = req.query.path || '/app';
-  const sortMode = req.query.sort || 'default'; // 'default', 'tr' (time reverse), 'S' (size)
+  const sortMode = req.query.sort || 'default';
   const container = docker.getContainer(req.params.id);
 
   let lsFlags = ['-la'];

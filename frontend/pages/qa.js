@@ -1,9 +1,9 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
-   - Interactive 1-Click Fixes & Recommendations Engine
+   - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer with 777 warning badges, colorized permissions, file type highlighting, chmod / chown controls, and in-place editor
+   - Container File Explorer with chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -15,6 +15,7 @@ let currentSort = 'default'; // 'default', 'tr', 'S'
 let currentViewMode = 'table'; // 'table' or 'raw'
 let rawLsOutput = '';
 let fetchedItems = [];
+let currentDeductionsMap = {};
 
 export async function renderQA(container) {
   container.innerHTML = `
@@ -87,11 +88,9 @@ export async function renderQA(container) {
       .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; vertical-align: middle; }
       .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); }
       
-      /* Row highlighting for 777 */
       .file-tree-table tr.is-777 td { background: rgba(239, 68, 68, 0.08); }
       .file-tree-table tr.is-777:hover td { background: rgba(239, 68, 68, 0.15); }
 
-      /* Permission Badges */
       .perm-badge { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; font-family: var(--font-mono); display: inline-flex; align-items: center; gap: 4px; }
       .perm-badge.p-777 { background: rgba(239,68,68,0.25); color: #ff5252; border: 1px solid rgba(239,68,68,0.5); box-shadow: 0 0 8px rgba(239,68,68,0.3); animation: pulse-777 2s infinite; }
       @keyframes pulse-777 { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
@@ -100,7 +99,6 @@ export async function renderQA(container) {
       .perm-badge.p-readonly { background: rgba(168,85,247,0.15); color: #a855f7; border: 1px solid rgba(168,85,247,0.3); }
       .perm-badge.p-std      { background: rgba(0,198,255,0.1); color: #00c6ff; border: 1px solid rgba(0,198,255,0.2); }
 
-      /* File Name Highlights */
       .file-name { font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
       .file-name.dir-name   { color: #00c6ff; font-weight: 700; }
       .file-name.exec-file  { color: #22c55e; }
@@ -113,7 +111,32 @@ export async function renderQA(container) {
 
       .file-action-btn { padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: 0.15s; }
       .file-action-btn:hover { background: var(--accent-glow); color: var(--accent-start); border-color: var(--accent); }
+
+      /* YAML Snippet Modal */
+      .qa-modal-overlay { position:fixed; inset:0; background:#00000080; backdrop-filter:blur(4px); z-index:1000; display:none; align-items:center; justify-content:center; }
+      .qa-modal-box { background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:16px; width:520px; max-width:94vw; padding:24px; box-shadow:var(--shadow-lg); }
     </style>
+
+    <!-- Fix Preview & YAML Modal -->
+    <div class="qa-modal-overlay" id="qa-fix-modal">
+      <div class="qa-modal-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-size:15px;font-weight:700;color:var(--text-primary)" id="qa-modal-title">📄 Fix & YAML Snippet Preview</span>
+          <button class="icon-btn" onclick="window.qaCloseModal()">✕</button>
+        </div>
+
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;" id="qa-modal-desc">
+          How this update is applied:
+        </div>
+
+        <div style="background:#070a10;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--font-mono);font-size:11px;line-height:1.6;color:#e6edf3;white-space:pre-wrap;margin-bottom:16px;" id="qa-modal-snippet"></div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="btn btn-secondary btn-sm" id="qa-copy-snippet-btn"><i class="ph ph-copy"></i> Copy YAML</button>
+          <button class="btn btn-primary btn-sm" id="qa-apply-modal-fix-btn"><i class="ph ph-lightning"></i> Apply Live Fix to Container</button>
+        </div>
+      </div>
+    </div>
 
     <div class="section-header">
       <div class="section-title">Container QA & Debugging Workbench</div>
@@ -227,6 +250,8 @@ export async function renderQA(container) {
   window.qaApplyFix          = qaApplyFix;
   window.qaChmod             = qaChmod;
   window.qaChown             = qaChown;
+  window.qaShowFixModal      = qaShowFixModal;
+  window.qaCloseModal        = qaCloseModal;
 
   // Load container list
   try {
@@ -242,7 +267,6 @@ export async function renderQA(container) {
       return `<option value="${c.Id}">${name} (${c.State})</option>`;
     }).join('');
 
-    // Auto-select first running container
     const running = containers.find(c => c.State === 'running') || containers[0];
     if (running) {
       sel.value = running.Id;
@@ -269,6 +293,8 @@ async function loadScore(id) {
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
+    currentDeductionsMap = {};
+    (data.deductions || []).forEach(d => { currentDeductionsMap[d.key] = d; });
 
     const strokeColor = score >= 80 ? '#22c55e' : score >= 70 ? '#00c6ff' : score >= 60 ? '#f59e0b' : '#ef4444';
     const strokeDash  = Math.round((score / 100) * 188);
@@ -298,11 +324,18 @@ async function loadScore(id) {
               <span class="pts-badge neg">${d.pts}</span>
             </div>
             ${d.recommendation ? `<div class="recom-desc">💡 ${escapeHtml(d.recommendation)}</div>` : ''}
-            ${d.fixable ? `
-              <button class="btn btn-success btn-sm" style="margin-top:4px;align-self:flex-start;" onclick="window.qaApplyFix('${d.key}')">
-                <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Fix')}
-              </button>
-            ` : ''}
+            <div style="display:flex;gap:6px;margin-top:4px">
+              ${d.fixable ? `
+                <button class="btn btn-success btn-sm" onclick="window.qaApplyFix('${d.key}')">
+                  <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Live Fix')}
+                </button>
+              ` : ''}
+              ${d.yamlSnippet ? `
+                <button class="btn btn-secondary btn-sm" onclick="window.qaShowFixModal('${d.key}')">
+                  <i class="ph ph-code"></i> View YAML Snippet
+                </button>
+              ` : ''}
+            </div>
           </div>
         `).join('')}
 
@@ -321,6 +354,51 @@ async function loadScore(id) {
   } catch (err) {
     area.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:12px">${err.message}</div>`;
   }
+}
+
+/* ── Show YAML Snippet & Fix Modal ───────────────────────────────────────── */
+function qaShowFixModal(key) {
+  const item = currentDeductionsMap[key];
+  if (!item) return;
+
+  const modal = document.getElementById('qa-fix-modal');
+  const title = document.getElementById('qa-modal-title');
+  const desc  = document.getElementById('qa-modal-desc');
+  const snippet = document.getElementById('qa-modal-snippet');
+  const applyBtn = document.getElementById('qa-apply-modal-fix-btn');
+  const copyBtn  = document.getElementById('qa-copy-snippet-btn');
+
+  title.textContent = `⚡ Fix: ${item.label}`;
+  desc.innerHTML = `
+    <b>💡 Recommendation:</b> ${escapeHtml(item.recommendation || '')}<br>
+    <span style="color:var(--accent-start);font-size:11px">
+      • <b>Live Update:</b> Applies cgroup memory/cpu/restart limits directly to kernel via Docker Engine without container restart.<br>
+      • <b>YAML Update:</b> Add the code below to your <code>docker-compose.yml</code> file to persist across container rebuilds.
+    </span>
+  `;
+
+  snippet.textContent = item.yamlSnippet || '# No YAML snippet available';
+
+  copyBtn.onclick = () => {
+    navigator.clipboard.writeText(item.yamlSnippet || '');
+    toast('Copied YAML snippet to clipboard!', 'success');
+  };
+
+  if (item.fixable) {
+    applyBtn.style.display = '';
+    applyBtn.onclick = async () => {
+      await qaApplyFix(item.key);
+      qaCloseModal();
+    };
+  } else {
+    applyBtn.style.display = 'none';
+  }
+
+  modal.style.display = 'flex';
+}
+
+function qaCloseModal() {
+  document.getElementById('qa-fix-modal').style.display = 'none';
 }
 
 /* ── 1-Click Apply Live Fix ──────────────────────────────────────────────── */
