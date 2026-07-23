@@ -51,6 +51,33 @@ This document tracks identified edge cases, reported issues, and resolution hist
 
 ---
 
+### [BUG-006] GateScanner AV False Positive (`TRW64.Evo`) on Air-Gapped Scanner
+- **Severity**: High (Compliance / Security Gate)
+- **Description**: SASA Software GateScanner flagged `bare-url.bare`, `bare-path.bare`, `bare-fs.bare`, and `node-pty` Windows PE binaries in `node_modules` as false positive `TRW64.Evo` trojan.
+- **Root Cause**: Unnecessary Windows, macOS, Android, and iOS native prebuilt binaries bundled inside npm packages.
+- **Resolution**: Updated `Dockerfile` and `package-release.sh` to strip non-Linux prebuilt binary directories (`win32-*`, `darwin-*`, `android-*`, `ios-*`) post-install. Reduced tarball size from 145MB to 130MB and passed GateScanner sanitization cleanly.
+- **Status**: Fixed in v2.0.0.
+
+---
+
+### [BUG-007] Compose Builder JS Syntax Error (Duplicate `addConnection`)
+- **Severity**: High
+- **Description**: Opening the Web UI rendered a blank screen on the Dashboard.
+- **Root Cause**: Duplicate `addConnection` function declaration in `frontend/pages/compose.js` causing ES module parse error.
+- **Resolution**: Removed duplicate function declaration from `frontend/pages/compose.js`.
+- **Status**: Fixed in v2.0.0.
+
+---
+
+### [BUG-008] Modal Toggle `.hidden` CSS Specificity Conflict
+- **Severity**: Medium
+- **Description**: Modal dialogs (Compose Builder node edit, templates, image load) failed to open or close on click.
+- **Root Cause**: CSS specificity conflict with `.hidden` utility class overriding modal display rules.
+- **Resolution**: Migrated all modal toggles to explicit inline `style.display = 'flex'` / `'none'`.
+- **Status**: Fixed in v2.0.0.
+
+---
+
 ## Known Limitations
 
 - **Distroless Containers**: Containers without `/bin/sh` or `/bin/bash` cannot launch interactive TTY sessions (standard Docker behavior; non-interactive exec is available via Container Inspect/Exec tab).

@@ -26,8 +26,12 @@ DockerForge is an enterprise-ready, self-hosted Docker management Web UI designe
 | **Volumes** | Management | List local/NFS/tmpfs volumes, inspect mount paths, create, remove, prune | ✅ Completed |
 | **Live Logs** | Centralized Logs | Searchable container log viewer with tail sizing, text filter, download & copy | ✅ Completed |
 | **Health** | System Health | Monitor container health checks (`healthy`/`unhealthy`) and host daemon state | ✅ Completed |
-| **Cleanup** | Disk Cleanup | One-click system prune for containers, images, volumes, and networks | ✅ Completed |
-| **Air-Gap** | Offline Ready | 100% bundled vendor assets, zero external CDN calls, works offline in RHEL 9 | ✅ Completed |
+| **Spec Exporter** | Multi-Format Export | Reverse-engineer container inspect to Docker Compose YAML, Dockerfile, K8s Pod YAML, and Helm Charts | ✅ Completed |
+| **Security Audit** | Container Auditor | 11 offline security checks (privileged, UID 0, docker socket, limits, caps, healthchecks), risk scoring (0-100), letter grade (A-F), fix guidance | ✅ Completed |
+| **Compose Builder** | Visual Node Graph | Drag-and-drop interactive microservices canvas, bezier connections, live docker-compose.yml sync, instant stack deployment via Dockerode socket | ✅ Completed |
+| | Presets & Load | Quick templates (Postgres, Oracle Server, Oracle Client), local image dropdown, offline `.tar.gz` image load stream | ✅ Completed |
+| | Full Compose Specs | Supports `depends_on`, `healthcheck`, `env_file`, `secrets`, `command`, `entrypoint`, `user`, `working_dir`, `privileged`, `mem_limit`, `cpus`, `extra_hosts` | ✅ Completed |
+| **Air-Gap** | Offline Ready | 100% bundled vendor assets, zero external CDN calls, stripped non-Linux binaries (GateScanner compliant), works offline in RHEL 9 | ✅ Completed |
 
 ---
 

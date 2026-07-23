@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-07-22 — Drag-and-Drop Compose Builder Release
+
+### Added
+- **Visual Drag-and-Drop Compose Builder**:
+  - Interactive SVG + HTML node canvas for visually designing multi-container stacks.
+  - Interactive service node creation, bezier curve link connections, drag positioning, node selection, and deletion.
+  - Real-time two-way synchronization with generated `docker-compose.yml`.
+  - Single-click deployment of entire stacks directly via Docker socket API (`POST /api/compose/deploy`).
+- **Compose Service Specifications**:
+  - Full property editor supporting `depends_on`, `healthcheck`, `env_file`, `secrets`, `command`, `entrypoint`, `user`, `working_dir`, `privileged`, `mem_limit`, `cpus`, `extra_hosts`, `ports`, `volumes`, `environment`, and `networks`.
+- **Pre-Built Stack Templates**:
+  - Quick-start templates for `PostgreSQL`, `Oracle Database Server`, and `Oracle Client`.
+- **Image Selection & Offline Archive Loader**:
+  - Dynamic local image selector dropdown populated from host Docker engine.
+  - Drag-and-drop / file upload modal for loading offline `.tar.gz` and `.tar` container image archives directly into Docker engine via raw stream pipeline (`POST /api/images/load`).
+
+### Fixed
+- **GateScanner Compliance**: Stripped all non-Linux prebuilt binaries (`win32-*`, `darwin-*`, `android-*`, `ios-*`) in `Dockerfile` and `package-release.sh` to eliminate false-positive AV detections (`TRW64.Evo`).
+- **Modal Display**: Replaced `.hidden` CSS class toggling with inline `style.display = 'flex'` / `'none'` across all modals.
+- **Frontend Syntax**: Removed duplicate function declaration in `compose.js`.
+
+---
+
+## [1.2.0] - 2026-07-21 — Security Audit Engine Release
+
+### Added
+- **Container Security Auditor**:
+  - 11 automated offline container misconfiguration & privilege checks (privileged mode, root UID execution, docker socket exposure, sensitive host mounts, memory/CPU limits, dangerous Linux capabilities, host network/PID namespace sharing, missing healthchecks, missing restart policies).
+  - Risk score calculation (0–100) and letter grades (**A–F**).
+  - Rich UI page featuring overall security score, risk grade badges, severity counters (Critical, Warning, Info, Pass), expandable container cards, and actionable remediation steps.
+
+---
+
 ## [1.1.0] - 2026-07-22 — Specification Exporter & Helm Chart Release
 
 ### Added

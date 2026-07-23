@@ -6,51 +6,44 @@ This document outlines the product roadmap and technical specifications for upco
 
 ---
 
-## 🛡️ v1.2.0 — Security & Vulnerability Scanning Phase
+## ✅ Completed Releases
 
-### 1. Image Vulnerability Scanner (Trivy / Grype Integration)
-- **Offline Scanning Engine**: Integrated local container image scanner to audit local Docker/Podman images for CVEs without external internet connectivity.
-- **Severity Breakdown**: Group vulnerabilities by severity rating (`Critical`, `High`, `Medium`, `Low`) with CVE identifiers, affected packages, and fixed version recommendations.
-- **Export Reports**: One-click JSON / PDF / Markdown security audit report downloads.
+### 🛡️ v1.2.0 — Security & Misconfiguration Audit Engine [COMPLETED]
+- ✅ **Offline Container Security Audit**: 11 automated security checks (privileged mode, root UID 0 execution, docker socket exposure, sensitive host mounts, memory/CPU limits, dangerous capabilities, network/PID host mode, healthchecks, restart policies).
+- ✅ **Risk Scoring & Letter Grades**: Calculates container security risk rating (0-100) and letter grades (**A–F**) with actionable fix recommendations.
 
-### 2. Container Security Audit & Misconfiguration Detector
-- **Privilege Auditing**: Highlight containers running with `--privileged` flags or root user execution (`USER root`).
-- **Socket Exposure Warnings**: Detect hazardous mounts of `/var/run/docker.sock` or host filesystem mounts.
-- **Resource Limit Enforcement**: Flag containers operating without memory (`--memory`) or CPU limits.
-
----
-
-## ☸️ v1.3.0 — Kubernetes Direct Deployment & Multi-Host Management
-
-### 1. Direct Kubernetes Cluster Deployment ("Deploy to K8s")
-- **Cluster Connection**: Connect to Kubernetes clusters via Kubeconfig context or in-cluster service account.
-- **Instant Manifest Application**: Apply generated `pod.yaml`, `deployment.yaml`, or `Helm Charts` directly into selected Kubernetes namespaces (`kubectl apply` / Helm SDK integration).
-
-### 2. Multi-Host Engine Switcher
-- **Centralized Engine Selector**: Switch seamless control between multiple local and remote Docker/Podman hosts (Dev, Staging, Production).
-- **TLS & SSH Daemon Connections**: Support connection over `tcp://`, `unix://`, and `ssh://` for remote engine management.
+### 🎨 v2.0.0 — Drag-and-Drop Visual Compose Builder [COMPLETED]
+- ✅ **Interactive Node Graph Canvas**: Visual microservices stack graph with draggable nodes, Bezier curve links, node inspector panel, and live `docker-compose.yml` code generation.
+- ✅ **Stack Deploy Engine**: Deploy entire multi-container stacks directly via Docker socket API (`POST /api/compose/deploy`).
+- ✅ **Full Compose Specifications**: Supports `depends_on`, `healthcheck`, `env_file`, `secrets`, `command`, `entrypoint`, `user`, `working_dir`, `privileged`, `mem_limit`, `cpus`, `extra_hosts`, ports, volumes, and networks.
+- ✅ **Presets & Offline Loader**: Templates for PostgreSQL, Oracle Server, and Oracle Client; local image selector dropdown + `.tar.gz` offline image load stream.
 
 ---
 
-## 💾 v1.4.0 — Container Backup, Snapshot & Auto-Updates
+## 🔮 Future Version Roadmap (Select Next Target)
 
-### 1. One-Click Container & Volume Backup/Restore
-- **State & Storage Snapshots**: Create encrypted `.tar.gz` snapshots of container configurations, volumes, and mounted directory state.
-- **Restore & Migration**: One-click restore to create identical container clones on any host.
-
-### 2. Automatic Rolling Updates (Watchtower Engine)
-- **Image Hash Tracker**: Monitor local registry tags and automatically perform zero-downtime rolling restarts when newer base images are loaded.
+### 🚀 Target A: Image Vulnerability Scanner (Trivy / Grype Offline CVE Integration) — v2.1.0
+- **Offline Trivy / Grype Vulnerability Scanner**: Integrate static image vulnerability scanning for local Docker/Podman images without requiring external internet.
+- **CVE Breakdown & Filtering**: Categorize CVEs by severity rating (`Critical`, `High`, `Medium`, `Low`) with package names, vulnerable versions, and fixed version recommendations.
+- **Security Report Export**: One-click JSON / PDF / Markdown security report export.
 
 ---
 
-## 🎨 v2.0.0 — Visual Canvas & CI/CD Pipeline Generator
+### ☸️ Target B: Direct Kubernetes Cluster Deployment & Multi-Host Selector — v2.2.0
+- **"Deploy to K8s" Engine**: Connect to Kubernetes clusters (via Kubeconfig or service account) and apply generated K8s manifests / Helm Charts directly to target namespaces.
+- **Multi-Host Engine Switcher**: Switch control dynamically between multiple remote/local Docker engines (`unix://`, `tcp://`, `ssh://`) across Dev, Staging, and Production environments.
 
-### 1. Drag-and-Drop Visual Compose Builder
-- **Interactive Microservices Canvas**: Visual drag-and-drop node graph for designing multi-container stacks, connecting service networks, and configuring environment dependencies.
-- **Live Compose Sync**: Real-time two-way synchronization between visual graph and generated `docker-compose.yml`.
+---
 
-### 2. CI/CD Pipeline Generator
-- **Workflow Automation**: Auto-generate `.github/workflows/docker-build.yml`, `.gitlab-ci.yml`, and Jenkinsfile templates tailored for container build, scan, and registry push pipelines.
+### 💾 Target C: One-Click Backup, Snapshot & Auto-Rollout Engine — v2.3.0
+- **Container & Volume State Snapshots**: Create encrypted `.tar.gz` snapshots of container state, volumes, environment configuration, and mounted folders.
+- **One-Click Restore & Migration**: Restore container snapshots to clone containers across different machines or hosts.
+- **Rolling Update Engine**: Monitor local registry tags and auto-trigger rolling container restarts when updated offline base images are loaded.
+
+---
+
+### ⚡ Target D: CI/CD Pipeline & Workflow Generator — v2.4.0
+- **Automated Workflow Generator**: Visual builder to auto-generate `.github/workflows/docker-build.yml`, `.gitlab-ci.yml`, `Jenkinsfile`, and Tekton pipelines tailored for container build, scan, and offline registry deployment.
 
 ---
 
