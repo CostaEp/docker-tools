@@ -78,6 +78,42 @@ This document tracks identified edge cases, reported issues, and resolution hist
 
 ---
 
+### [BUG-009] File Explorer `parseLsLine` 4-digit size date matching bug
+- **Severity**: High
+- **Description**: Files and directories with 4-digit sizes (e.g. `4096`) failed to parse dates cleanly, extracting corrupted file names (e.g. `/app/Jul 23 19:51 frontend`).
+- **Root Cause**: Regex `/^\d{4}$/` in `parseLsLine` matched byte sizes at index 4 instead of year fields at index 6.
+- **Resolution**: Updated date index loop in `parseLsLine` to start at index 5 (`i = 5`), ensuring accurate file name and permission extraction.
+- **Status**: Fixed in v2.2.0.
+
+---
+
+### [BUG-010] Double Path Concatenation in File Explorer Input (`/etc/hosts//etc/hosts`)
+- **Severity**: Medium
+- **Description**: Clicking a file item after typing a full file path in the directory input bar appended the file name twice (`/etc/hosts//etc/hosts`), causing file read errors.
+- **Root Cause**: Unsanitized string concatenation between `currentPath` and `item.name`.
+- **Resolution**: Added path normalization and deduplication in `frontend/pages/qa.js` (`cleanPath = fullPath.replace(/\/+/g, '/')`).
+- **Status**: Fixed in v2.2.0.
+
+---
+
+### [BUG-011] Docker Binary Stream Frame Fragmentation Corrupting Base64 Reading (`q\j{h00...`)
+- **Severity**: High
+- **Description**: Reading file contents inside containers produced garbled text or decoding errors for certain files.
+- **Root Cause**: Docker API attach stdout stream sends 8-byte multiplexing frame headers. Naive chunk slicing (`chunk.slice(8)`) stripped 8 bytes from every buffer chunk when frames were fragmented across data events, corrupting base64 strings.
+- **Resolution**: Wrote custom Docker binary stream demuxer in `backend/routes/qa.js` (`execInContainer`), parsing frame length headers (`readUInt32BE(4)`) and reassembling stdout buffers cleanly before base64 decoding.
+- **Status**: Fixed in v2.2.0.
+
+---
+
+### [BUG-012] QA Scorecard Card Layout Text Overflow
+- **Severity**: Medium (UI/UX)
+- **Description**: Two-column layout in QA page compressed scorecard recommendations and action buttons, causing horizontal text cut-off.
+- **Root Cause**: Restricted grid width in 2-column flex layout.
+- **Resolution**: Overhauled QA Workbench page to a 100% full-width single-column vertical stack layout (`width: 100%`).
+- **Status**: Fixed in v2.2.0.
+
+---
+
 ## Known Limitations
 
 - **Distroless Containers**: Containers without `/bin/sh` or `/bin/bash` cannot launch interactive TTY sessions (standard Docker behavior; non-interactive exec is available via Container Inspect/Exec tab).
