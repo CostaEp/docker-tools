@@ -126,6 +126,7 @@ export const api = {
   qa: {
     containerScore: (id)        => request('GET',    `/api/qa/containers/${id}/score`),
     composeScore:   (yaml)      => request('POST',   '/api/qa/compose/score', { yaml }),
+    applyFix:       (id, fixKey)=> request('POST',   `/api/qa/containers/${id}/fix`, { fixKey }),
     diagCmd:        (id, action, target) => request('POST', `/api/qa/containers/${id}/diag`, { action, target }),
     listFiles:      (id, path)  => request('GET',    `/api/qa/containers/${id}/files?path=${encodeURIComponent(path || '/app')}`),
     readFile:       (id, path)  => request('POST',   `/api/qa/containers/${id}/read`, { path }),

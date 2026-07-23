@@ -1,7 +1,8 @@
 /* ── DockerForge — QA & Debugging Workbench + Quality Scoring Engine ───────
    Endpoints:
-   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F)
-   POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F)
+   GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + fixes
+   POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F) + fixes
+   POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
    GET  /api/qa/containers/:id/files   — List directory contents inside container
    POST /api/qa/containers/:id/read    — Read file content inside container
@@ -30,45 +31,95 @@ function calculateContainerScore(info) {
       bonuses.push({ pts: 10, label: 'Container healthcheck passing (Healthy)' });
     } else if (state.Health?.Status === 'unhealthy') {
       score -= 25;
-      deductions.push({ pts: -25, label: 'Container healthcheck failing (Unhealthy)' });
+      deductions.push({
+        pts: -25,
+        key: 'HEALTHCHECK_FAILING',
+        label: 'Container healthcheck failing (Unhealthy)',
+        recommendation: 'Check application logs or adjust healthcheck test command/interval.',
+        fixable: false,
+      });
     }
   } else {
     score -= 10;
-    deductions.push({ pts: -10, label: 'No HEALTHCHECK defined' });
+    deductions.push({
+      pts: -10,
+      key: 'NO_HEALTHCHECK',
+      label: 'No HEALTHCHECK defined',
+      recommendation: 'Add a healthcheck command to monitor container responsiveness.',
+      fixable: false,
+    });
   }
 
   // 2. Memory Limit (15 pts)
   if (!hc.Memory || hc.Memory === 0) {
     score -= 15;
-    deductions.push({ pts: -15, label: 'No memory limit configured (OOM risk)' });
+    deductions.push({
+      pts: -15,
+      key: 'NO_MEM_LIMIT',
+      label: 'No memory limit configured (OOM risk)',
+      recommendation: 'Set a memory limit (e.g., 512MB) to prevent host memory exhaustion.',
+      fixable: true,
+      fixAction: 'Set 512MB Memory Limit',
+    });
   } else {
-    bonuses.push({ pts: 5, label: 'Memory limit configured' });
+    const memMB = Math.round(hc.Memory / 1024 / 1024);
+    bonuses.push({ pts: 5, label: `Memory limit configured (${memMB} MB)` });
   }
 
   // 3. CPU Limit (10 pts)
   if (!hc.NanoCpus && (!hc.CpuShares || hc.CpuShares === 0 || hc.CpuShares === 1024)) {
     score -= 10;
-    deductions.push({ pts: -10, label: 'No CPU limit configured' });
+    deductions.push({
+      pts: -10,
+      key: 'NO_CPU_LIMIT',
+      label: 'No CPU limit configured',
+      recommendation: 'Configure CPU allocation (e.g. 1.0 CPU) to prevent CPU starvation.',
+      fixable: true,
+      fixAction: 'Set 1.0 CPU Limit',
+    });
+  } else {
+    bonuses.push({ pts: 5, label: 'CPU limit configured' });
   }
 
   // 4. Privileged Mode (-30 pts)
   if (hc.Privileged) {
     score -= 30;
-    deductions.push({ pts: -30, label: 'Privileged mode enabled (High security risk)' });
+    deductions.push({
+      pts: -30,
+      key: 'PRIVILEGED_MODE',
+      label: 'Privileged mode enabled (High security risk)',
+      recommendation: 'Disable --privileged flag and add specific Linux capabilities (--cap-add).',
+      fixable: false,
+    });
   }
 
   // 5. Root User (-15 pts)
   const user = cfg.User || '';
   if (!user || user === 'root' || user === '0' || user === '0:0') {
     score -= 15;
-    deductions.push({ pts: -15, label: 'Process executing as Root user (UID 0)' });
+    deductions.push({
+      pts: -15,
+      key: 'ROOT_USER',
+      label: 'Process executing as Root user (UID 0)',
+      recommendation: 'Set a non-root USER instruction in Dockerfile (e.g. USER node / 1001).',
+      fixable: false,
+    });
+  } else {
+    bonuses.push({ pts: 5, label: `Running as non-root user (${user})` });
   }
 
   // 6. Restart Policy (10 pts)
   const rp = hc.RestartPolicy?.Name || 'no';
   if (rp === 'no') {
     score -= 10;
-    deductions.push({ pts: -10, label: 'No restart policy configured' });
+    deductions.push({
+      pts: -10,
+      key: 'NO_RESTART_POLICY',
+      label: 'No restart policy configured',
+      recommendation: 'Set restart policy to "unless-stopped" for automatic crash recovery.',
+      fixable: true,
+      fixAction: 'Set "unless-stopped" Restart Policy',
+    });
   } else if (rp === 'unless-stopped' || rp === 'on-failure') {
     bonuses.push({ pts: 5, label: `Resilient restart policy ("${rp}")` });
   }
@@ -76,11 +127,24 @@ function calculateContainerScore(info) {
   // 7. State penalties
   if (state.Status === 'exited' && state.ExitCode !== 0) {
     score -= 20;
-    deductions.push({ pts: -20, label: `Container exited with error code ${state.ExitCode}` });
+    deductions.push({
+      pts: -20,
+      key: 'EXITED_WITH_ERROR',
+      label: `Container exited with error code ${state.ExitCode}`,
+      recommendation: 'Inspect container logs to diagnose and fix application runtime crashes.',
+      fixable: false,
+    });
   }
   if (state.OOMKilled) {
     score -= 25;
-    deductions.push({ pts: -25, label: 'Container killed by Out-Of-Memory (OOM)' });
+    deductions.push({
+      pts: -25,
+      key: 'OOM_KILLED',
+      label: 'Container killed by Out-Of-Memory (OOM)',
+      recommendation: 'Increase container memory limit or optimize application memory footprint.',
+      fixable: true,
+      fixAction: 'Increase RAM to 1GB',
+    });
   }
 
   const finalScore = Math.max(0, Math.min(100, score));
@@ -122,7 +186,7 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 1. Service memory limits
   if (totalMemLimits === 0) {
     score -= 20;
-    deductions.push({ pts: -20, label: 'No services have memory limits configured' });
+    deductions.push({ pts: -20, label: 'No services have memory limits configured', recommendation: 'Add mem_limit: 512m to services.' });
   } else if (totalMemLimits === svcKeys.length) {
     bonuses.push({ pts: 10, label: 'All services have memory limits configured' });
   }
@@ -130,7 +194,7 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 2. Healthchecks
   if (totalHc === 0) {
     score -= 15;
-    deductions.push({ pts: -15, label: 'No healthchecks defined across stack' });
+    deductions.push({ pts: -15, label: 'No healthchecks defined across stack', recommendation: 'Add healthcheck block to critical services.' });
   } else if (totalHc === svcKeys.length) {
     bonuses.push({ pts: 10, label: 'All services have healthchecks configured' });
   }
@@ -138,13 +202,13 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   // 3. Restart Policies
   if (totalRestart === 0) {
     score -= 15;
-    deductions.push({ pts: -15, label: 'No restart policies configured' });
+    deductions.push({ pts: -15, label: 'No restart policies configured', recommendation: 'Add restart: unless-stopped to services.' });
   }
 
   // 4. Privileged Mode
   if (totalPriv > 0) {
     score -= (totalPriv * 20);
-    deductions.push({ pts: -(totalPriv * 20), label: `${totalPriv} service(s) running in privileged mode` });
+    deductions.push({ pts: -(totalPriv * 20), label: `${totalPriv} service(s) running in privileged mode`, recommendation: 'Remove privileged: true flag.' });
   }
 
   // 5. Dependency management
@@ -176,7 +240,6 @@ async function execInContainer(container, cmdArray) {
   return new Promise((resolve, reject) => {
     let output = '';
     stream.on('data', chunk => {
-      // Strip docker multiplex header (8 bytes) if present
       let str = chunk.toString('utf8');
       if (chunk.length >= 8 && (chunk[0] === 1 || chunk[0] === 2)) {
         str = chunk.slice(8).toString('utf8');
@@ -197,6 +260,36 @@ router.get('/containers/:id/score', async (req, res) => {
     res.json({ id: req.params.id, name: info.Name?.replace('/', ''), ...rating });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/* ── POST /api/qa/containers/:id/fix ──────────────────────────────────── */
+router.post('/containers/:id/fix', async (req, res) => {
+  const { fixKey } = req.body;
+  const container  = docker.getContainer(req.params.id);
+
+  try {
+    const updateOpts = {};
+    if (fixKey === 'NO_MEM_LIMIT') {
+      updateOpts.Memory = 512 * 1024 * 1024; // 512MB
+      updateOpts.MemorySwap = -1;
+    } else if (fixKey === 'OOM_KILLED') {
+      updateOpts.Memory = 1024 * 1024 * 1024; // 1GB
+      updateOpts.MemorySwap = -1;
+    } else if (fixKey === 'NO_CPU_LIMIT') {
+      updateOpts.NanoCpus = 1000000000; // 1.0 CPU
+    } else if (fixKey === 'NO_RESTART_POLICY') {
+      updateOpts.RestartPolicy = { Name: 'unless-stopped' };
+    } else {
+      return res.status(400).json({ error: `Cannot auto-fix ${fixKey}` });
+    }
+
+    await container.update(updateOpts);
+    const info = await container.inspect();
+    const newRating = calculateContainerScore(info);
+    res.json({ ok: true, fixKey, newRating });
+  } catch (err) {
+    res.status(500).json({ error: `Fix failed: ${err.message}` });
   }
 });
 
@@ -285,7 +378,6 @@ router.post('/containers/:id/write', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    // Base64 encode to safely write via echo
     const b64 = Buffer.from(content).toString('base64');
     await execInContainer(container, ['/bin/sh', '-c', `echo "${b64}" | base64 -d > "${filePath}"`]);
     res.json({ ok: true, path: filePath });

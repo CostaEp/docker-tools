@@ -1,6 +1,7 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
-   - Container Quality & Health Score (0-100, Grade A-F, deduction breakdown)
+   - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
+   - Interactive 1-Click Fixes & Recommendations Engine
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
    - Container File Explorer & Live In-Place File Editor
    ────────────────────────────────────────────────────────────────────────── */
@@ -14,39 +15,72 @@ let currentPath = '/app';
 export async function renderQA(container) {
   container.innerHTML = `
     <style>
-      .qa-grid { display:grid; grid-template-columns:320px 1fr; gap:20px; height:100%; }
-      .qa-card { background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:20px; }
-      .qa-card-title { font-size:13px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+      .qa-grid { display:grid; grid-template-columns:360px 1fr; gap:20px; height:100%; }
+      .qa-card { background:var(--bg-raised); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:var(--shadow-sm); }
+      .qa-card-title { font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
 
-      /* Scorecard */
-      .score-display { display:flex; align-items:center; gap:16px; background:var(--bg-hover); padding:16px; border-radius:12px; margin-bottom:14px; border:1px solid var(--border); }
-      .grade-circle { width:54px; height:54px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; font-weight:900; color:#fff; flex-shrink:0; }
-      .grade-A { background:linear-gradient(135deg, #00c873, #00965e); box-shadow:0 0 16px #00c87340; }
-      .grade-B { background:linear-gradient(135deg, #00c6ff, #0072ff); box-shadow:0 0 16px #00c6ff40; }
-      .grade-C { background:linear-gradient(135deg, #ffd600, #ff9100); box-shadow:0 0 16px #ffd60040; }
-      .grade-D { background:linear-gradient(135deg, #ff9100, #ff3d00); box-shadow:0 0 16px #ff910040; }
-      .grade-F { background:linear-gradient(135deg, #ff5252, #d50000); box-shadow:0 0 16px #ff525240; }
+      /* Sleek Redesigned Score Display */
+      .score-display-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+        border: 1px solid var(--border-bright); border-radius: 14px; padding: 20px;
+        display: flex; align-items: center; gap: 20px; margin-bottom: 16px; position: relative; overflow: hidden;
+      }
+      
+      .score-ring-wrap { position: relative; width: 68px; height: 68px; flex-shrink: 0; }
+      .score-ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+      .score-ring-bg { stroke: rgba(255,255,255,0.08); stroke-width: 6; fill: none; }
+      .score-ring-bar { stroke-width: 6; stroke-linecap: round; fill: none; transition: stroke-dashoffset 0.6s ease; }
 
-      .score-num { font-size:22px; font-weight:800; color:var(--text-primary); }
-      .score-label { font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; }
+      .grade-badge-center {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        font-size: 22px; font-weight: 900; color: var(--text-primary);
+      }
 
-      .pts-list { display:flex; flex-direction:column; gap:6px; font-size:12px; max-height:220px; overflow-y:auto; }
-      .pts-item { display:flex; align-items:center; justify-content:space-between; padding:6px 10px; border-radius:6px; background:var(--bg-hover); }
-      .pts-item.deduction { border-left:3px solid #ff5252; color:#fca5a5; }
-      .pts-item.bonus     { border-left:3px solid #00c873; color:#6ee7b7; }
+      .score-meta-title { font-size: 26px; font-weight: 800; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
+      .score-meta-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+      /* Sleek Recommendation Cards */
+      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 340px; overflow-y: auto; padding-right: 4px; }
+      
+      .recom-card {
+        background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+        padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; transition: all 0.2s ease;
+      }
+      .recom-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
+
+      .recom-card.deduction { border-left: 3px solid #ef4444; }
+      .recom-card.bonus     { border-left: 3px solid #22c55e; }
+
+      .recom-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+      .recom-label  { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+      
+      .pts-badge { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; font-family: var(--font-mono); }
+      .pts-badge.neg { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
+      .pts-badge.pos { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
+
+      .recom-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; }
 
       /* Diag buttons */
-      .diag-btn-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:14px; }
-      .diag-btn { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--bg-hover); border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:600; color:var(--text-primary); cursor:pointer; transition:.15s; }
-      .diag-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent)15; }
+      .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 14px; }
+      .diag-btn {
+        display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+        background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px;
+        font-size: 12px; font-weight: 600; color: var(--text-primary); cursor: pointer; transition: all 0.2s ease;
+      }
+      .diag-btn:hover { border-color: var(--accent); color: var(--accent-start); background: var(--accent-glow); transform: translateY(-1px); }
 
-      /* Console & File Editor */
-      .qa-console { background:#070a10; border:1px solid var(--border); border-radius:8px; padding:14px; font-family:var(--font-mono); font-size:12px; line-height:1.6; color:#e6edf3; min-height:180px; max-height:300px; overflow:auto; white-space:pre-wrap; }
+      /* Console Output */
+      .qa-console {
+        background: #050811; border: 1px solid var(--border); border-radius: 10px;
+        padding: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
+        color: #e6edf3; min-height: 180px; max-height: 300px; overflow: auto; white-space: pre-wrap;
+      }
       
-      .file-tree { max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:8px; background:var(--bg-hover); padding:8px; }
-      .file-item { display:flex; align-items:center; gap:8px; padding:6px 10px; border-radius:6px; font-size:12px; font-family:monospace; cursor:pointer; color:var(--text-secondary); transition:.1s; }
-      .file-item:hover { background:var(--bg-card); color:var(--text-primary); }
-      .file-item.dir { font-weight:700; color:var(--accent); }
+      /* File explorer */
+      .file-tree { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-surface); padding: 8px; }
+      .file-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; font-size: 12px; font-family: var(--font-mono); cursor: pointer; color: var(--text-secondary); transition: 0.15s; }
+      .file-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+      .file-item.dir { font-weight: 700; color: var(--accent-start); }
     </style>
 
     <div class="section-header">
@@ -65,11 +99,11 @@ export async function renderQA(container) {
           </select>
         </div>
 
-        <!-- Scorecard Card -->
+        <!-- Redesigned Scorecard Card -->
         <div class="qa-card" id="qa-score-card">
-          <div class="qa-card-title"><i class="ph ph-shield-check"></i> Quality & Health Score</div>
+          <div class="qa-card-title"><i class="ph ph-shield-check"></i> Quality & Health Rating</div>
           <div id="qa-score-area">
-            <div style="text-align:center;padding:20px;color:var(--text-muted)">Select a container to inspect quality score.</div>
+            <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Select a container to inspect quality rating and recommendations.</div>
           </div>
         </div>
 
@@ -103,7 +137,7 @@ export async function renderQA(container) {
         <div class="qa-card">
           <div class="qa-card-title" style="justify-content:space-between">
             <span><i class="ph ph-folder-open"></i> Live File Explorer & Editor</span>
-            <span id="qa-file-path-badge" style="font-family:monospace;font-size:11px;color:var(--accent)">/app</span>
+            <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
           </div>
 
           <div style="display:flex;gap:8px;margin-bottom:10px;">
@@ -118,11 +152,11 @@ export async function renderQA(container) {
 
           <!-- File Editor -->
           <div id="qa-editor-wrap" style="display:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-              <span id="qa-editing-file" style="font-family:monospace;font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+              <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
               <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
             </div>
-            <textarea class="form-control" id="qa-file-editor" style="min-height:180px;font-family:monospace;font-size:11px;line-height:1.5;background:#0d1117" placeholder="File contents..."></textarea>
+            <textarea class="form-control" id="qa-file-editor" style="min-height:180px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
           </div>
 
         </div>
@@ -137,6 +171,7 @@ export async function renderQA(container) {
   window.qaLoadDir           = qaLoadDir;
   window.qaOpenFile          = qaOpenFile;
   window.qaSaveFile          = qaSaveFile;
+  window.qaApplyFix          = qaApplyFix;
 
   // Load container list
   try {
@@ -170,37 +205,87 @@ async function qaOnSelectContainer(id) {
   await loadScore(id);
 }
 
-/* ── Load Scorecard ──────────────────────────────────────────────────────── */
+/* ── Load Redesigned Scorecard ────────────────────────────────────────────── */
 async function loadScore(id) {
   const area = document.getElementById('qa-score-area');
   if (!area) return;
-  area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text-muted)"><i class="ph ph-spinner"></i> Computing quality score...</div>';
+  area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px"><i class="ph ph-spinner"></i> Evaluating container quality rating...</div>';
 
   try {
     const data = await api.qa.containerScore(id);
-    const gradeCls = `grade-${data.grade}`;
+    const score = data.score;
+
+    const strokeColor = score >= 80 ? '#22c55e' : score >= 70 ? '#00c6ff' : score >= 60 ? '#f59e0b' : '#ef4444';
+    const strokeDash  = Math.round((score / 100) * 188); // circumference of r=30 is ~188
 
     area.innerHTML = `
-      <div class="score-display">
-        <div class="grade-circle ${gradeCls}">${data.grade}</div>
+      <!-- Sleek Score Ring Display -->
+      <div class="score-display-card">
+        <div class="score-ring-wrap">
+          <svg viewBox="0 0 70 70">
+            <circle class="score-ring-bg" cx="35" cy="35" r="30" />
+            <circle class="score-ring-bar" cx="35" cy="35" r="30"
+              stroke="${strokeColor}"
+              stroke-dasharray="188" stroke-dashoffset="${188 - strokeDash}" />
+          </svg>
+          <div class="grade-badge-center" style="color:${strokeColor}">${data.grade}</div>
+        </div>
         <div>
-          <div class="score-num">${data.score} <span style="font-size:14px;color:var(--text-muted)">/ 100</span></div>
-          <div class="score-label">Container Quality & Health</div>
+          <div class="score-meta-title">${score} <span style="font-size:14px;color:var(--text-muted);font-weight:500">/ 100</span></div>
+          <div class="score-meta-sub">Container Quality & Health Score</div>
         </div>
       </div>
 
-      <div class="pts-list">
-        ${data.deductions.map(d => `<div class="pts-item deduction"><span>${d.label}</span><b>${d.pts}</b></div>`).join('')}
-        ${data.bonuses.map(b => `<div class="pts-item bonus"><span>${b.label}</span><b>+${b.pts}</b></div>`).join('')}
-        ${!data.deductions.length && !data.bonuses.length ? '<div style="color:var(--text-muted);font-size:12px">No deductions or bonuses.</div>' : ''}
+      <!-- Deductions & Actionable Fixes -->
+      <div class="recom-list">
+        ${data.deductions.map(d => `
+          <div class="recom-card deduction">
+            <div class="recom-header">
+              <div class="recom-label">${escapeHtml(d.label)}</div>
+              <span class="pts-badge neg">${d.pts}</span>
+            </div>
+            ${d.recommendation ? `<div class="recom-desc">💡 ${escapeHtml(d.recommendation)}</div>` : ''}
+            ${d.fixable ? `
+              <button class="btn btn-success btn-sm" style="margin-top:4px;align-self:flex-start;" onclick="window.qaApplyFix('${d.key}')">
+                <i class="ph ph-lightning"></i> ${escapeHtml(d.fixAction || 'Apply Fix')}
+              </button>
+            ` : ''}
+          </div>
+        `).join('')}
+
+        ${data.bonuses.map(b => `
+          <div class="recom-card bonus">
+            <div class="recom-header">
+              <div class="recom-label">✓ ${escapeHtml(b.label)}</div>
+              <span class="pts-badge pos">+${b.pts}</span>
+            </div>
+          </div>
+        `).join('')}
+
+        ${!data.deductions.length && !data.bonuses.length ? '<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:12px">All container quality checks passed cleanly!</div>' : ''}
       </div>
     `;
   } catch (err) {
-    area.innerHTML = `<div style="color:#ff5252;font-size:12px">${err.message}</div>`;
+    area.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:12px">${err.message}</div>`;
   }
 }
 
-/* ── Run Diagnostic Command ──────────────────────────────────────────────── */
+/* ── 1-Click Apply Live Fix ──────────────────────────────────────────────── */
+async function qaApplyFix(fixKey) {
+  if (!selectedContainerId) return;
+  try {
+    toast('⚡ Applying live container update...', 'info');
+    const res = await api.qa.applyFix(selectedContainerId, fixKey);
+    if (res.ok) {
+      toast('✅ Fix applied successfully!', 'success');
+      await loadScore(selectedContainerId);
+    }
+  } catch (err) {
+    toast(`Fix failed: ${err.message}`, 'error');
+  }
+}
+
+/* ── Diagnostic Commands ─────────────────────────────────────────────────── */
 async function qaRunDiag(action) {
   if (!selectedContainerId) { toast('Select a container first', 'error'); return; }
   const consoleEl = document.getElementById('qa-diag-console');
@@ -251,11 +336,11 @@ async function qaLoadDir() {
       const icon = item.isDir ? '📁' : '📄';
       const full = `${path.replace(/\/$/, '')}/${item.name}`;
       return `<div class="file-item ${item.isDir ? 'dir' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
-        <span>${icon}</span> <span>${item.name}</span>
+        <span>${icon}</span> <span>${escapeHtml(item.name)}</span>
       </div>`;
     }).join('');
   } catch (err) {
-    treeEl.innerHTML = `<div style="color:#ff5252;font-size:12px;padding:6px">${err.message}</div>`;
+    treeEl.innerHTML = `<div style="color:#ef4444;font-size:12px;padding:6px">${err.message}</div>`;
   }
 }
 
@@ -266,7 +351,6 @@ async function qaOpenFile(fullPath, isDir) {
     return;
   }
 
-  // Open file in editor
   const wrap = document.getElementById('qa-editor-wrap');
   const title = document.getElementById('qa-editing-file');
   const editor = document.getElementById('qa-file-editor');
@@ -295,4 +379,8 @@ async function qaSaveFile() {
   } catch (err) {
     toast(`Save failed: ${err.message}`, 'error');
   }
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
