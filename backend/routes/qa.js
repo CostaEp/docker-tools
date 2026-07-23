@@ -38,6 +38,19 @@ async function fetchContainerTelemetry(container) {
     const cpusCount = stats.cpu_stats?.online_cpus || stats.cpu_stats?.cpu_usage?.percpu_usage?.length || 1;
     const cpuPercent = (sysDelta > 0 && cpuDelta > 0) ? parseFloat(((cpuDelta / sysDelta) * cpusCount * 100).toFixed(1)) : 0.0;
 
+    // Disk / Storage Block I/O calculation
+    let diskReadBytes = 0;
+    let diskWriteBytes = 0;
+    const blkioServ = stats.blkio_stats?.service_bytes_recursive || [];
+    blkioServ.forEach(b => {
+      if (b.op === 'Read' || b.op === 'read') diskReadBytes += b.value;
+      if (b.op === 'Write' || b.op === 'write') diskWriteBytes += b.value;
+    });
+
+    const diskReadMB  = parseFloat((diskReadBytes / 1024 / 1024).toFixed(1));
+    const diskWriteMB = parseFloat((diskWriteBytes / 1024 / 1024).toFixed(1));
+    const diskTotalMB = parseFloat((diskReadMB + diskWriteMB).toFixed(1));
+
     return {
       usageMB,
       maxMB,
@@ -45,9 +58,12 @@ async function fetchContainerTelemetry(container) {
       recMemMB,
       cpuPercent,
       cpusCount,
+      diskReadMB,
+      diskWriteMB,
+      diskTotalMB,
     };
   } catch (err) {
-    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1 };
+    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
   }
 }
 

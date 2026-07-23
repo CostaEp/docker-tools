@@ -1,7 +1,8 @@
 /* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
    Features:
+   - 100% Full-Width Single Stack Vertical Layout (No side-by-side cramped columns)
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
-   - Interactive Live Resource Telemetry Sparklines (RAM & CPU SVG curves updated live)
+   - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Disk Storage I/O SVG curves updated live)
    - Smart Dynamic Sizing Recommendation Engine (Peak RAM + 50% safety buffer)
    - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
    - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
@@ -26,6 +27,7 @@ let currentActiveFixKey = null;
 // Telemetry History for Live Charts (up to 20 points)
 let ramHistory = [];
 let cpuHistory = [];
+let diskHistory = [];
 let telemetryTimer = null;
 
 export async function renderQA(container) {
@@ -37,38 +39,38 @@ export async function renderQA(container) {
 
   container.innerHTML = `
     <style>
-      .qa-grid { display:grid; grid-template-columns: minmax(420px, 460px) 1fr; gap:20px; height:100%; }
-      @media (max-width: 1200px) { .qa-grid { grid-template-columns: 1fr; } }
+      /* 100% Full-Width Single Column Vertical Stack Layout */
+      .qa-grid { display: flex; flex-direction: column; gap: 20px; width: 100%; box-sizing: border-box; }
 
-      .qa-card { background:var(--bg-raised); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:var(--shadow-sm); }
+      .qa-card { background:var(--bg-raised); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:var(--shadow-sm); width:100%; box-sizing:border-box; }
       .qa-card-title { font-size:12px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
 
       /* Sleek Redesigned Score Display */
       .score-display-card {
         background: linear-gradient(135deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-        border: 1px solid var(--border-bright); border-radius: 14px; padding: 18px;
-        display: flex; align-items: center; gap: 20px; margin-bottom: 14px; position: relative; overflow: hidden;
+        border: 1px solid var(--border-bright); border-radius: 14px; padding: 20px;
+        display: flex; align-items: center; gap: 24px; margin-bottom: 16px; position: relative; overflow: hidden;
       }
       
-      .score-ring-wrap { position: relative; width: 68px; height: 68px; flex-shrink: 0; }
+      .score-ring-wrap { position: relative; width: 72px; height: 72px; flex-shrink: 0; }
       .score-ring-wrap svg { width: 100%; height: 100%; transform: rotate(-90deg); }
       .score-ring-bg { stroke: rgba(255,255,255,0.08); stroke-width: 6; fill: none; }
       .score-ring-bar { stroke-width: 6; stroke-linecap: round; fill: none; transition: stroke-dashoffset 0.6s ease; }
 
       .grade-badge-center {
         position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-        font-size: 22px; font-weight: 900; color: var(--text-primary);
+        font-size: 24px; font-weight: 900; color: var(--text-primary);
       }
 
-      .score-meta-title { font-size: 26px; font-weight: 800; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
-      .score-meta-sub   { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+      .score-meta-title { font-size: 28px; font-weight: 800; color: var(--text-primary); line-height: 1; margin-bottom: 4px; }
+      .score-meta-sub   { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
 
-      /* Sleek Recommendation Cards (Non-overflowing) */
-      .recom-list { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding-right: 4px; }
+      /* Sleek Recommendation Cards (100% Full Width) */
+      .recom-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
       
       .recom-card {
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
-        padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; transition: all 0.2s ease;
+        padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; transition: all 0.2s ease;
         box-sizing: border-box; width: 100%;
       }
       .recom-card:hover { border-color: var(--border-bright); transform: translateY(-1px); }
@@ -76,19 +78,25 @@ export async function renderQA(container) {
       .recom-card.deduction { border-left: 4px solid #ef4444; }
       .recom-card.bonus     { border-left: 4px solid #22c55e; }
 
-      .recom-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-      .recom-label  { font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.3; flex: 1; }
+      .recom-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .recom-label  { font-size: 14px; font-weight: 600; color: var(--text-primary); line-height: 1.3; }
       
-      .pts-badge { font-size: 11px; font-weight: 800; padding: 2px 7px; border-radius: 99px; font-family: var(--font-mono); flex-shrink: 0; }
+      .pts-badge { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 99px; font-family: var(--font-mono); flex-shrink: 0; }
       .pts-badge.neg { background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.25); }
       .pts-badge.pos { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.25); }
 
-      .recom-desc { font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; word-break: break-word; }
+      .recom-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
-      .recom-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+      .recom-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+
+      /* Live Sparklines Grid (3 columns for RAM, CPU, Storage) */
+      .sparkline-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; width: 100%; }
+      .sparkline-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-sizing: border-box; }
+      .sparkline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+      .sparkline-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
 
       /* Diag buttons */
-      .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-bottom: 14px; }
+      .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
       .diag-btn {
         display: flex; align-items: center; gap: 8px; padding: 10px 14px;
         background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px;
@@ -100,14 +108,14 @@ export async function renderQA(container) {
       .qa-console {
         background: #050811; border: 1px solid var(--border); border-radius: 10px;
         padding: 14px; font-family: var(--font-mono); font-size: 12px; line-height: 1.6;
-        color: #e6edf3; min-height: 180px; max-height: 300px; overflow: auto; white-space: pre-wrap;
+        color: #e6edf3; min-height: 180px; max-height: 340px; overflow: auto; white-space: pre-wrap;
       }
       
       /* File explorer styling */
-      .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+      .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
       .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
-      .file-tree-table th { text-align: left; padding: 6px 10px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
-      .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; vertical-align: middle; }
+      .file-tree-table th { text-align: left; padding: 8px 12px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
+      .file-tree-table td { padding: 8px 12px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; vertical-align: middle; }
       .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); }
       
       .file-tree-table tr.is-777 td { background: rgba(239, 68, 68, 0.08); }
@@ -131,20 +139,15 @@ export async function renderQA(container) {
       .view-toggle-btn { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; }
       .view-toggle-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
 
-      .file-action-btn { padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: 0.15s; }
+      .file-action-btn { padding: 3px 8px; font-size: 11px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: 0.15s; }
       .file-action-btn:hover { background: var(--accent-glow); color: var(--accent-start); border-color: var(--accent); }
 
       /* YAML Snippet Modal */
       .qa-modal-overlay { position:fixed; inset:0; background:#00000080; backdrop-filter:blur(4px); z-index:1000; display:none; align-items:center; justify-content:center; }
-      .qa-modal-box { background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:16px; width:640px; max-width:94vw; padding:24px; box-shadow:var(--shadow-lg); }
+      .qa-modal-box { background:var(--bg-raised); border:1px solid var(--border-bright); border-radius:16px; width:680px; max-width:94vw; padding:24px; box-shadow:var(--shadow-lg); }
 
       .modal-tab-btn { padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; }
       .modal-tab-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
-
-      /* Live Sparkline Card */
-      .sparkline-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 14px; }
-      .sparkline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-      .sparkline-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
     </style>
 
     <!-- Fix Preview & Full YAML Modal -->
@@ -165,7 +168,7 @@ export async function renderQA(container) {
           Complete production-ready docker-compose.yml for this container with all recommendations applied:
         </div>
 
-        <div style="background:#050811;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--font-mono);font-size:11.5px;line-height:1.6;color:#e6edf3;white-space:pre;max-height:300px;overflow:auto;margin-bottom:16px;" id="qa-modal-snippet"></div>
+        <div style="background:#050811;border:1px solid var(--border);border-radius:10px;padding:14px;font-family:var(--font-mono);font-size:11.5px;line-height:1.6;color:#e6edf3;white-space:pre;max-height:320px;overflow:auto;margin-bottom:16px;" id="qa-modal-snippet"></div>
 
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button class="btn btn-secondary btn-sm" id="qa-copy-snippet-btn"><i class="ph ph-copy"></i> Copy Full YAML</button>
@@ -178,134 +181,146 @@ export async function renderQA(container) {
       <div class="section-title">Container QA & Debugging Workbench</div>
     </div>
 
+    <!-- 100% Full-Width Single Stack Container -->
     <div class="qa-grid">
-      <!-- LEFT COLUMN: Container Selector + Health & Quality Scorecard + Live Sparkline Telemetry -->
-      <div style="display:flex;flex-direction:column;gap:16px;">
 
-        <!-- Container Selector -->
-        <div class="qa-card">
-          <div class="qa-card-title"><i class="ph ph-package"></i> Select Target Container</div>
-          <select class="form-control" id="qa-container-sel" onchange="window.qaOnSelectContainer(this.value)">
-            <option value="">Loading containers...</option>
-          </select>
+      <!-- CARD 1: Container Selector -->
+      <div class="qa-card">
+        <div class="qa-card-title"><i class="ph ph-package"></i> Select Target Container</div>
+        <select class="form-control" id="qa-container-sel" onchange="window.qaOnSelectContainer(this.value)">
+          <option value="">Loading containers...</option>
+        </select>
+      </div>
+
+      <!-- CARD 2: Real-Time Resource Telemetry & Live Sparkline Curves (RAM, CPU, Storage) -->
+      <div class="qa-card" id="qa-telemetry-card" style="display:none">
+        <div class="qa-card-title" style="justify-content:space-between">
+          <span><i class="ph ph-chart-line-up"></i> Real-Time Resource Telemetry Curves (RAM, CPU & Storage I/O)</span>
+          <span style="font-size:10px;color:var(--accent-start);background:var(--accent-glow);padding:2px 8px;border-radius:6px;font-weight:700">● LIVE MONITORING (3s)</span>
         </div>
 
-        <!-- Live Resource Telemetry Sparkline Graphs (Charts) -->
-        <div class="qa-card" id="qa-telemetry-card" style="display:none">
-          <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-chart-line-up"></i> Live Telemetry & Resource Curves</span>
-            <span style="font-size:10px;color:var(--accent-start);background:var(--accent-glow);padding:2px 6px;border-radius:4px;font-weight:700">● LIVE (3s)</span>
-          </div>
-
+        <div class="sparkline-grid">
           <!-- RAM Sparkline Chart -->
           <div class="sparkline-card">
             <div class="sparkline-header">
               <span class="sparkline-title"><i class="ph ph-cpu"></i> RAM Memory Curve</span>
-              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#00c6ff" id="qa-chart-ram-text">0 MB</span>
+              <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#00c6ff" id="qa-chart-ram-text">0 MB</span>
             </div>
             <div id="qa-chart-ram-svg"></div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:4px;font-family:var(--font-mono)">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono)">
               <span id="qa-chart-ram-peak">Peak: 0 MB</span>
               <span id="qa-chart-ram-rec" style="color:var(--accent-start)">Rec Limit: 256 MB</span>
             </div>
           </div>
 
           <!-- CPU Sparkline Chart -->
-          <div class="sparkline-card" style="margin-bottom:0">
+          <div class="sparkline-card">
             <div class="sparkline-header">
               <span class="sparkline-title"><i class="ph ph-lightning"></i> CPU Load Curve</span>
-              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#22c55e" id="qa-chart-cpu-text">0.0%</span>
+              <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#22c55e" id="qa-chart-cpu-text">0.0%</span>
             </div>
             <div id="qa-chart-cpu-svg"></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono)">
+              <span>Core Alloc: 1.0 CPU</span>
+              <span style="color:#22c55e">Active</span>
+            </div>
+          </div>
+
+          <!-- Disk Storage I/O Sparkline Chart -->
+          <div class="sparkline-card">
+            <div class="sparkline-header">
+              <span class="sparkline-title"><i class="ph ph-hard-drive"></i> Storage & Disk I/O Curve</span>
+              <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#f59e0b" id="qa-chart-disk-text">0.0 MB</span>
+            </div>
+            <div id="qa-chart-disk-svg"></div>
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono)">
+              <span id="qa-chart-disk-read">Read: 0 MB</span>
+              <span id="qa-chart-disk-write" style="color:#f59e0b">Write: 0 MB</span>
+            </div>
           </div>
         </div>
+      </div>
 
-        <!-- Redesigned Scorecard Card -->
-        <div class="qa-card" id="qa-score-card">
-          <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-shield-check"></i> Quality & Health Rating</span>
-            <button class="btn btn-secondary btn-sm" id="btn-copy-top-yaml" style="display:none;font-size:11px;padding:4px 8px" onclick="window.qaShowFullYamlModal()">
-              <i class="ph ph-file-code"></i> Copy Full YAML
+      <!-- CARD 3: Health & Quality Rating Scorecard -->
+      <div class="qa-card" id="qa-score-card">
+        <div class="qa-card-title" style="justify-content:space-between">
+          <span><i class="ph ph-shield-check"></i> Quality & Health Rating</span>
+          <button class="btn btn-secondary btn-sm" id="btn-copy-top-yaml" style="display:none;font-size:11px;padding:4px 10px" onclick="window.qaShowFullYamlModal()">
+            <i class="ph ph-file-code"></i> Copy Full docker-compose.yml
+          </button>
+        </div>
+        <div id="qa-score-area">
+          <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Select a container to inspect quality rating and recommendations.</div>
+        </div>
+      </div>
+
+      <!-- CARD 4: 1-Click Diagnostics Workbench -->
+      <div class="qa-card">
+        <div class="qa-card-title"><i class="ph ph-wrench"></i> 1-Click Diagnostics Workbench</div>
+        <div class="diag-btn-grid">
+          <button class="diag-btn" onclick="window.qaRunDiag('df')"><i class="ph ph-hard-drive"></i> Disk (df -h)</button>
+          <button class="diag-btn" onclick="window.qaRunDiag('free')"><i class="ph ph-cpu"></i> RAM (free -m)</button>
+          <button class="diag-btn" onclick="window.qaRunDiag('ports')"><i class="ph ph-broadcast"></i> Open Ports</button>
+          <button class="diag-btn" onclick="window.qaRunDiag('ps')"><i class="ph ph-list-bullets"></i> Processes (ps)</button>
+          <button class="diag-btn" onclick="window.qaRunDiag('env')"><i class="ph ph-identification-card"></i> Env Vars</button>
+        </div>
+
+        <!-- Ping Tool -->
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input type="text" class="form-control" id="qa-ping-target" placeholder="Ping target host / IP (e.g. postgres, 8.8.8.8)..." style="flex:1">
+          <button class="btn btn-secondary btn-sm" onclick="window.qaRunPing()"><i class="ph ph-plugs-connected"></i> Test Ping</button>
+        </div>
+
+        <!-- Console Output -->
+        <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
+      </div>
+
+      <!-- CARD 5: Live File Explorer & Permissions Manager -->
+      <div class="qa-card">
+        <div class="qa-card-title" style="justify-content:space-between">
+          <span><i class="ph ph-folder-open"></i> Live File Explorer (Colorized 777 & Perms)</span>
+          <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
+        </div>
+
+        <!-- Navigation Bar -->
+        <div class="file-toolbar">
+          <div style="display:flex;gap:8px;flex:1;">
+            <button class="btn btn-secondary btn-sm" onclick="window.qaNavUp()" title="Go up one directory">
+              <i class="ph ph-arrow-up"></i> ..
             </button>
+            <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Directory path (e.g. /app, /etc)..." style="flex:1">
+            <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open Dir</button>
           </div>
-          <div id="qa-score-area">
-            <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:13px">Select a container to inspect quality rating and recommendations.</div>
+
+          <!-- Sort & View Controls -->
+          <div style="display:flex;gap:6px;">
+            <select class="form-control" id="qa-sort-sel" onchange="window.qaSetSort(this.value)" style="padding:4px 8px;font-size:11px;width:130px">
+              <option value="default">ls -la (Name)</option>
+              <option value="tr">ls -la -tr (Date)</option>
+              <option value="S">ls -la -S (Size)</option>
+            </select>
+
+            <button class="view-toggle-btn active" id="btn-view-table" onclick="window.qaSetViewMode('table')" title="Formatted Table View">📋 Table</button>
+            <button class="view-toggle-btn" id="btn-view-raw" onclick="window.qaSetViewMode('raw')" title="Raw ls -la Terminal Output">🖥️ Raw</button>
           </div>
+        </div>
+
+        <!-- File Tree / Raw Output Container -->
+        <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px;max-height:300px">
+          <div style="color:var(--text-muted);font-size:12px;padding:8px">Enter directory path and click Open Dir.</div>
+        </div>
+
+        <!-- File Editor -->
+        <div id="qa-editor-wrap" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
+            <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
+          </div>
+          <textarea class="form-control" id="qa-file-editor" style="min-height:200px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
         </div>
 
       </div>
 
-      <!-- RIGHT COLUMN: 1-Click Diagnostics Workbench + File Explorer -->
-      <div style="display:flex;flex-direction:column;gap:16px;overflow-y:auto;">
-
-        <!-- 1-Click Diagnostics Workbench -->
-        <div class="qa-card">
-          <div class="qa-card-title"><i class="ph ph-wrench"></i> 1-Click Diagnostics Workbench</div>
-          <div class="diag-btn-grid">
-            <button class="diag-btn" onclick="window.qaRunDiag('df')"><i class="ph ph-hard-drive"></i> Disk (df -h)</button>
-            <button class="diag-btn" onclick="window.qaRunDiag('free')"><i class="ph ph-cpu"></i> RAM (free -m)</button>
-            <button class="diag-btn" onclick="window.qaRunDiag('ports')"><i class="ph ph-broadcast"></i> Open Ports</button>
-            <button class="diag-btn" onclick="window.qaRunDiag('ps')"><i class="ph ph-list-bullets"></i> Processes (ps)</button>
-            <button class="diag-btn" onclick="window.qaRunDiag('env')"><i class="ph ph-identification-card"></i> Env Vars</button>
-          </div>
-
-          <!-- Ping Tool -->
-          <div style="display:flex;gap:8px;margin-bottom:12px;">
-            <input type="text" class="form-control" id="qa-ping-target" placeholder="Ping target host / IP (e.g. postgres, 8.8.8.8)..." style="flex:1">
-            <button class="btn btn-secondary btn-sm" onclick="window.qaRunPing()"><i class="ph ph-plugs-connected"></i> Test Ping</button>
-          </div>
-
-          <!-- Console Output -->
-          <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
-        </div>
-
-        <!-- Live File Browser & Editor (with ls -la + chmod / chown + 777 color highlighting) -->
-        <div class="qa-card">
-          <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-folder-open"></i> Live File Explorer (Colorized 777 & Perms)</span>
-            <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
-          </div>
-
-          <!-- Navigation Bar -->
-          <div class="file-toolbar">
-            <div style="display:flex;gap:6px;flex:1;">
-              <button class="btn btn-secondary btn-sm" onclick="window.qaNavUp()" title="Go up one directory">
-                <i class="ph ph-arrow-up"></i> ..
-              </button>
-              <input type="text" class="form-control" id="qa-dir-input" value="/app" placeholder="Directory path (e.g. /app, /etc)..." style="flex:1">
-              <button class="btn btn-secondary btn-sm" onclick="window.qaLoadDir()"><i class="ph ph-folder"></i> Open Dir</button>
-            </div>
-
-            <!-- Sort & View Controls -->
-            <div style="display:flex;gap:6px;">
-              <select class="form-control" id="qa-sort-sel" onchange="window.qaSetSort(this.value)" style="padding:4px 8px;font-size:11px;width:120px">
-                <option value="default">ls -la (Name)</option>
-                <option value="tr">ls -la -tr (Date)</option>
-                <option value="S">ls -la -S (Size)</option>
-              </select>
-
-              <button class="view-toggle-btn active" id="btn-view-table" onclick="window.qaSetViewMode('table')" title="Formatted Table View">📋 Table</button>
-              <button class="view-toggle-btn" id="btn-view-raw" onclick="window.qaSetViewMode('raw')" title="Raw ls -la Terminal Output">🖥️ Raw</button>
-            </div>
-          </div>
-
-          <!-- File Tree / Raw Output Container -->
-          <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px;max-height:240px">
-            <div style="color:var(--text-muted);font-size:12px;padding:8px">Enter directory path and click Open Dir.</div>
-          </div>
-
-          <!-- File Editor -->
-          <div id="qa-editor-wrap" style="display:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
-              <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
-            </div>
-            <textarea class="form-control" id="qa-file-editor" style="min-height:180px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
-          </div>
-
-        </div>
-
-      </div>
     </div>
   `;
 
@@ -355,6 +370,7 @@ async function qaOnSelectContainer(id) {
   selectedContainerId = id;
   ramHistory = [];
   cpuHistory = [];
+  diskHistory = [];
 
   if (telemetryTimer) {
     clearInterval(telemetryTimer);
@@ -373,7 +389,7 @@ async function qaOnSelectContainer(id) {
 }
 
 /* ── Render Live SVG Sparkline Chart ─────────────────────────────────────── */
-function renderSparklineSvg(points, color = '#00c6ff', height = 36, width = 340) {
+function renderSparklineSvg(points, color = '#00c6ff', height = 45, width = 360) {
   if (!points || points.length === 0) {
     return `<svg viewBox="0 0 ${width} ${height}" style="width:100%;height:${height}px"><line x1="0" y1="${height/2}" x2="${width}" y2="${height/2}" stroke="${color}" stroke-opacity="0.3" stroke-dasharray="4"/></svg>`;
   }
@@ -384,7 +400,7 @@ function renderSparklineSvg(points, color = '#00c6ff', height = 36, width = 340)
 
   const pathCoords = points.map((val, idx) => {
     const x = (idx / Math.max(1, points.length - 1)) * width;
-    const y = height - ((val - minVal) / range) * (height - 10) - 5;
+    const y = height - ((val - minVal) / range) * (height - 12) - 6;
     return `${x.toFixed(1)},${y.toFixed(1)}`;
   });
 
@@ -411,13 +427,16 @@ function renderSparklineSvg(points, color = '#00c6ff', height = 36, width = 340)
 async function pollTelemetry(id) {
   try {
     const data = await api.qa.containerScore(id);
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256 };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
 
     ramHistory.push(t.usageMB);
     if (ramHistory.length > 20) ramHistory.shift();
 
     cpuHistory.push(t.cpuPercent);
     if (cpuHistory.length > 20) cpuHistory.shift();
+
+    diskHistory.push(t.diskTotalMB);
+    if (diskHistory.length > 20) diskHistory.shift();
 
     // Update Sparkline Charts
     const ramText = document.getElementById('qa-chart-ram-text');
@@ -428,6 +447,11 @@ async function pollTelemetry(id) {
     const cpuText = document.getElementById('qa-chart-cpu-text');
     const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
 
+    const diskText  = document.getElementById('qa-chart-disk-text');
+    const diskSvg   = document.getElementById('qa-chart-disk-svg');
+    const diskRead  = document.getElementById('qa-chart-disk-read');
+    const diskWrite = document.getElementById('qa-chart-disk-write');
+
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
     if (ramRec)  ramRec.textContent  = `Rec Limit: ${t.recMemMB} MB`;
@@ -435,6 +459,11 @@ async function pollTelemetry(id) {
 
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
+
+    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB`;
+    if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
+    if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
+    if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
 
   } catch (err) {
     // Ignore silent polling errors
@@ -453,13 +482,14 @@ async function loadScore(id) {
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256 };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
     currentFullYaml = data.fullComposeYaml || '';
     if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
     if (telemetryCard) telemetryCard.style.display = 'block';
 
-    ramHistory = [t.usageMB];
-    cpuHistory = [t.cpuPercent];
+    ramHistory  = [t.usageMB];
+    cpuHistory  = [t.cpuPercent];
+    diskHistory = [t.diskTotalMB];
 
     // Initial render of Live Sparklines
     const ramText = document.getElementById('qa-chart-ram-text');
@@ -470,6 +500,11 @@ async function loadScore(id) {
     const cpuText = document.getElementById('qa-chart-cpu-text');
     const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
 
+    const diskText  = document.getElementById('qa-chart-disk-text');
+    const diskSvg   = document.getElementById('qa-chart-disk-svg');
+    const diskRead  = document.getElementById('qa-chart-disk-read');
+    const diskWrite = document.getElementById('qa-chart-disk-write');
+
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
     if (ramRec)  ramRec.textContent  = `Rec Limit: ${t.recMemMB} MB`;
@@ -477,6 +512,11 @@ async function loadScore(id) {
 
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
+
+    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB`;
+    if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
+    if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
+    if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
 
     currentDeductionsMap = {};
     (data.deductions || []).forEach(d => { currentDeductionsMap[d.key] = d; });
