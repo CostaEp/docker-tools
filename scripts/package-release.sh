@@ -49,9 +49,19 @@ cp "${PROJECT_DIR}/ROADMAP.md" "${TARGET_DIR}/"
 cp "${PROJECT_DIR}/BUGS.md" "${TARGET_DIR}/"
 cp "${PROJECT_DIR}/FEATURES.md" "${TARGET_DIR}/"
 
-# Step 5: Compress final release package archive
+# Step 5: Strip non-Linux prebuilt native binaries (prevent AV false positives)
+echo "5️⃣ Removing non-Linux prebuilt binaries (win32/darwin/android/ios)..."
+echo "   ⚠️  These trigger false-positive AV alerts (TRW64.Evo) on GateScanner."
+STRIP_PATTERNS=("win32-x64" "win32-arm64" "win32-ia32" "darwin-x64" "darwin-arm64" "android-arm" "android-arm64" "android-ia32" "android-x64" "ios-arm64-simulator" "ios-x64-simulator")
+for pattern in "${STRIP_PATTERNS[@]}"; do
+    find "${TARGET_DIR}" -type d -name "${pattern}" -exec rm -rf {} + 2>/dev/null || true
+done
+REMOVED_COUNT=$(echo "${STRIP_PATTERNS[@]}" | wc -w | tr -d ' ')
+echo "   ✓ Stripped prebuilt directories for: ${STRIP_PATTERNS[*]}"
+
+# Step 6: Compress final release package archive
 TARBALL="${DIST_DIR}/${RELEASE_NAME}.tar.gz"
-echo "5️⃣ Compressing final release package archive (${TARBALL})..."
+echo "6️⃣ Compressing final release package archive (${TARBALL})..."
 cd "${DIST_DIR}"
 tar -czf "${RELEASE_NAME}.tar.gz" "${RELEASE_NAME}"
 
