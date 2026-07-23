@@ -2,7 +2,7 @@
 
 > **Future Architecture Planning, Version Roadmap, and Feature Pipeline**
 
-This document outlines the product roadmap and technical specifications for releases of **DockerForge**.
+This document outlines the official product roadmap and technical specifications for upcoming releases of **DockerForge**.
 
 ---
 
@@ -28,25 +28,30 @@ This document outlines the product roadmap and technical specifications for rele
 
 ---
 
-## 🔮 Future Version Roadmap (Select Next Target)
+## 🔮 Upcoming Release Roadmap
 
-### 🚀 Target A: Image Vulnerability Scanner (Trivy / Grype Offline CVE Integration) — v2.3.0
+### 🛡️ v2.3.0 — Offline Security & Vulnerability Scanning Engine (Target A)
 - **Offline Trivy / Grype Vulnerability Scanner**: Integrate static image vulnerability scanning for local Docker/Podman images without requiring external internet.
 - **CVE Breakdown & Filtering**: Categorize CVEs by severity rating (`Critical`, `High`, `Medium`, `Low`) with package names, vulnerable versions, and fixed version recommendations.
-- **Security Report Export**: One-click JSON / PDF / Markdown security report export.
+- **Container File Diff & Integrity Monitor**: Detect modified (`~`), created (`+`), and deleted (`-`) files inside running containers compared to original base images.
 
 ---
 
-### ☸️ Target B: Direct Kubernetes Cluster Deployment & Multi-Host Selector — v2.4.0
-- **"Deploy to K8s" Engine**: Connect to Kubernetes clusters (via Kubeconfig or service account) and apply generated K8s manifests / Helm Charts directly to target namespaces.
-- **Multi-Host Engine Switcher**: Switch control dynamically between multiple remote/local Docker engines (`unix://`, `tcp://`, `ssh://`) across Dev, Staging, and Production environments.
+### 📦 v2.4.0 — Air-Gap Stack Bundler & Volume Backup Engine (Target B)
+- **1-Click Air-Gap Stack Bundler**: Export complete multi-container stacks (all container images + docker-compose.yml + environment files + offline setup script) into a SINGLE self-extracting `.tar.gz` archive.
+- **Automated Volume Backup & Cron Snapshot Engine**: Scheduled cron backups for Docker volumes (PostgreSQL, Oracle, Redis, MySQL data), compressed `.tar.gz` encryption, and 1-click restore/migration.
 
 ---
 
-### 💾 Target C: One-Click Backup, Snapshot & Auto-Rollout Engine — v2.5.0
-- **Container & Volume State Snapshots**: Create encrypted `.tar.gz` snapshots of container state, volumes, environment configuration, and mounted folders.
-- **One-Click Restore & Migration**: Restore container snapshots to clone containers across different machines or hosts.
-- **Rolling Update Engine**: Monitor local registry tags and auto-trigger rolling container restarts when updated offline base images are loaded.
+### ⚡ v2.5.0 — Interactive Process Manager & Self-Healing Watchdog (Target C)
+- **Interactive Container Process Manager (`htop` / `top`)**: Live process table per container with thread count, memory/CPU per PID, and 1-click `kill -9` / `strace`.
+- **Auto-Self-Healing & Anomaly Engine**: Background watcher monitoring memory spikes, CPU loops, high restart counts, and crash loops (`CrashLoopBackOff`), with automated recovery rules.
+
+---
+
+### ☸️ v2.6.0 — Kubernetes Deployer & Network Traffic Inspector (Target D)
+- **Direct Kubernetes & OpenShift Namespace Deployer**: Convert containers and Compose stacks into K8s manifests (`Deployment`, `Service`, `ConfigMap`, `Secret`, `PVC`) and deploy directly to target namespaces via Kubeconfig.
+- **Live Network Traffic & Socket Inspector**: Visualizes network flow between microservices, active socket connections, and 1-click `.pcap` packet capture (`tcpdump`).
 
 ---
 
