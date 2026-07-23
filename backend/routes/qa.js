@@ -5,7 +5,7 @@
    POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
    GET  /api/qa/containers/:id/files   — List directory contents inside container (ls -la / ls -la -tr)
-   POST /api/qa/containers/:id/read    — Read file content inside container (base64 encoded read)
+   POST /api/qa/containers/:id/read    — Read file content inside container (base64 UTF-8 encoded read)
    POST /api/qa/containers/:id/write   — Write/save file content inside container (live edit)
    POST /api/qa/containers/:id/chmod   — Change permissions (chmod 755/644/777/etc)
    POST /api/qa/containers/:id/chown   — Change ownership (chown user:group)
@@ -15,7 +15,7 @@ const express = require('express');
 const router  = express.Router();
 const docker  = require('../docker');
 
-/* ── Helper: exec command inside container ───────────────────────────────── */
+/* ── Bulletproof Docker Stream Demuxer (Fixes Stream Fragmentation & Garbled Text) ── */
 async function execInContainer(container, cmdArray) {
   const exec = await container.exec({
     Cmd: cmdArray,
@@ -25,15 +25,43 @@ async function execInContainer(container, cmdArray) {
 
   const stream = await exec.start({ Tty: false });
   return new Promise((resolve, reject) => {
-    let output = '';
+    const stdoutBuffers = [];
+    let buffer = Buffer.alloc(0);
+
     stream.on('data', chunk => {
-      let str = chunk.toString('utf8');
-      if (chunk.length >= 8 && (chunk[0] === 1 || chunk[0] === 2)) {
-        str = chunk.slice(8).toString('utf8');
+      buffer = Buffer.concat([buffer, chunk]);
+
+      while (buffer.length >= 8) {
+        const streamType = buffer[0];
+        // If not 1 (stdout) or 2 (stderr), treat as raw un-multiplexed stream chunk
+        if (streamType !== 1 && streamType !== 2) {
+          stdoutBuffers.push(buffer);
+          buffer = Buffer.alloc(0);
+          break;
+        }
+
+        const frameSize = buffer.readUInt32BE(4);
+        if (buffer.length < 8 + frameSize) {
+          // Wait for complete frame to arrive
+          break;
+        }
+
+        const payload = buffer.slice(8, 8 + frameSize);
+        if (streamType === 1) { // stdout
+          stdoutBuffers.push(payload);
+        }
+        buffer = buffer.slice(8 + frameSize);
       }
-      output += str;
     });
-    stream.on('end', () => resolve(output.trim()));
+
+    stream.on('end', () => {
+      if (buffer.length > 0) {
+        stdoutBuffers.push(buffer);
+      }
+      const fullStdout = Buffer.concat(stdoutBuffers).toString('utf8');
+      resolve(fullStdout.trim());
+    });
+
     stream.on('error', err => reject(err));
   });
 }
@@ -638,9 +666,10 @@ router.post('/containers/:id/read', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    // Bulletproof base64 read: handles all file types, newlines, binary, quotes, spaces
+    // Bulletproof base64 read with stream demuxing: supports all UTF-8 characters, fonts, newlines, spaces
     const rawB64 = await execInContainer(container, ['/bin/sh', '-c', `cat "${filePath}" | base64`]);
-    const content = Buffer.from(rawB64.replace(/\s+/g, ''), 'base64').toString('utf8');
+    const cleanB64 = rawB64.replace(/[^A-Za-z0-9+/=]/g, '');
+    const content = Buffer.from(cleanB64, 'base64').toString('utf8');
     res.json({ path: filePath, content });
   } catch (err) {
     res.status(500).json({ error: `Failed to read file: ${err.message}` });
@@ -654,7 +683,7 @@ router.post('/containers/:id/write', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    const b64 = Buffer.from(content).toString('base64');
+    const b64 = Buffer.from(content, 'utf8').toString('base64');
     await execInContainer(container, ['/bin/sh', '-c', `echo "${b64}" | base64 -d > "${filePath}"`]);
     res.json({ ok: true, path: filePath });
   } catch (err) {

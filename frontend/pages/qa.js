@@ -5,6 +5,7 @@
    - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Storage Root FS + Volumes SVG curves updated live)
    - Clear Storage Breakdown: Container Write Layer Size (SizeRw), Host Disk Free/Used, and Volume Space with Progress Bars
    - Roomy Large File Explorer (max-height: 600px) & File Editor (min-height: 480px)
+   - Full UTF-8 & Font Character Encoding Support via Stream Demuxing (Fixes Garbled Text & Double Path Errors)
    - Base64 text/config file reader, chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
@@ -725,7 +726,7 @@ async function qaRunPing() {
 
 /* ── File Explorer (with ls -la parsing + chmod / chown + 777 highlight) ─── */
 function qaNavUp() {
-  let p = currentPath.replace(/\/$/, '');
+  let p = currentPath.replace(/\/+$/, '');
   const lastIdx = p.lastIndexOf('/');
   if (lastIdx <= 0) p = '/';
   else p = p.substring(0, lastIdx);
@@ -747,7 +748,8 @@ function qaSetViewMode(mode) {
 
 async function qaLoadDir() {
   if (!selectedContainerId) { toast('Select a container first', 'error'); return; }
-  const path = document.getElementById('qa-dir-input')?.value?.trim() || '/app';
+  let path = document.getElementById('qa-dir-input')?.value?.trim() || '/app';
+  path = path.replace(/\/+/g, '/');
   currentPath = path;
   document.getElementById('qa-file-path-badge').textContent = path;
 
@@ -799,7 +801,7 @@ function formatFileName(name, isDir) {
     return `<span class="file-name exec-file">⚡ ${escapeHtml(name)}</span>`;
   }
 
-  if (['env', 'pem', 'key', 'json', 'yml', 'yaml', 'conf', 'config', 'html', 'css', 'ts', 'go', 'rs', 'md', 'txt', 'log'].includes(ext) || name.includes('config') || name === '.env' || name === 'Dockerfile') {
+  if (['env', 'pem', 'key', 'json', 'yml', 'yaml', 'conf', 'config', 'html', 'css', 'ts', 'go', 'rs', 'md', 'txt', 'log', 'hosts'].includes(ext) || name.includes('config') || name === '.env' || name === 'Dockerfile' || name === 'hosts') {
     return `<span class="file-name config-file">🔒 ${escapeHtml(name)}</span>`;
   }
 
@@ -828,6 +830,8 @@ function renderFileTreeOutput() {
     return;
   }
 
+  const baseDir = currentPath.replace(/\/+$/, '');
+
   treeEl.innerHTML = `
     <table class="file-tree-table">
       <thead>
@@ -837,7 +841,15 @@ function renderFileTreeOutput() {
       </thead>
       <tbody>
         ${fetchedItems.map((item) => {
-          const full = `${currentPath.replace(/\/$/, '')}/${item.name}`;
+          let full = '';
+          if (item.name.startsWith('/')) {
+            full = item.name;
+          } else if (baseDir.endsWith('/' + item.name) || baseDir === item.name) {
+            full = baseDir;
+          } else {
+            full = `${baseDir}/${item.name}`.replace(/\/+/g, '/');
+          }
+
           const is777 = (item.perms || '').includes('rwxrwxrwx');
           
           return `<tr class="${item.isDir ? 'dir' : ''} ${is777 ? 'is-777' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
@@ -888,8 +900,10 @@ async function qaChown(fullPath, currentOwner) {
 }
 
 async function qaOpenFile(fullPath, isDir) {
+  const cleanPath = (fullPath || '').replace(/\/+/g, '/');
+
   if (isDir) {
-    document.getElementById('qa-dir-input').value = fullPath;
+    document.getElementById('qa-dir-input').value = cleanPath;
     await qaLoadDir();
     return;
   }
@@ -897,14 +911,14 @@ async function qaOpenFile(fullPath, isDir) {
   const wrap = document.getElementById('qa-editor-wrap');
   const title = document.getElementById('qa-editing-file');
   const editor = document.getElementById('qa-file-editor');
-  title.textContent = `Editing: ${fullPath}`;
+  title.textContent = `Editing: ${cleanPath}`;
   editor.value = 'Loading file content...';
   wrap.style.display = '';
 
   try {
-    const res = await api.qa.readFile(selectedContainerId, fullPath);
+    const res = await api.qa.readFile(selectedContainerId, cleanPath);
     editor.value = res.content;
-    editor.dataset.path = fullPath;
+    editor.dataset.path = cleanPath;
   } catch (err) {
     toast(`Read failed: ${err.message}`, 'error');
   }
