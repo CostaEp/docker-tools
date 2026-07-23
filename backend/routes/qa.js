@@ -268,31 +268,29 @@ function parseLsLine(line) {
   const isDir     = perms.startsWith('d');
   const isSymlink = perms.startsWith('l');
 
-  // Find date/time field (HH:MM or YYYY)
+  // Find HH:MM or YYYY pattern starting from index 5
   let timeIdx = -1;
-  for (let i = 4; i < parts.length - 1; i++) {
-    if (/^\d{1,2}:\d{2}$/.test(parts[i]) || /^\d{4}$/.test(parts[i])) {
+  for (let i = 5; i < parts.length - 1; i++) {
+    if (/^\d{1,2}:\d{2}$/.test(parts[i]) || (/^\d{4}$/.test(parts[i]) && i >= 6)) {
       timeIdx = i;
       break;
     }
   }
 
-  let nameIndex = timeIdx > 0 ? timeIdx + 1 : 8;
-  if (nameIndex >= parts.length) nameIndex = parts.length - 1;
-
+  const nameIndex = timeIdx > 0 ? timeIdx + 1 : (parts.length >= 9 ? 8 : 7);
   let name = parts.slice(nameIndex).join(' ');
-  if (!name) name = parts[parts.length - 1];
 
   if (isSymlink && name.includes(' -> ')) {
     name = name.split(' -> ')[0];
   }
 
+  name = name.trim();
   if (!name || name === '.' || name === '..') return null;
 
   const owner = parts[2] || 'root';
   const group = parts[3] || 'root';
   const size  = parts[4] || '0';
-  const date  = timeIdx > 2 ? parts.slice(timeIdx - 2, timeIdx + 1).join(' ') : '—';
+  const date  = timeIdx > 0 ? parts.slice(Math.max(5, timeIdx - 2), timeIdx + 1).join(' ') : parts.slice(5, Math.min(8, parts.length - 1)).join(' ');
 
   return { name, isDir: isDir || isSymlink, perms, owner: `${owner}:${group}`, size, date, raw: line };
 }
@@ -412,7 +410,7 @@ router.post('/containers/:id/chmod', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    const output = await execInContainer(container, ['chmod', mode, filePath]);
+    const output = await execInContainer(container, ['/bin/sh', '-c', `chmod ${mode} "${filePath}"`]);
     res.json({ ok: true, path: filePath, mode, output });
   } catch (err) {
     res.status(500).json({ error: `chmod failed: ${err.message}` });
@@ -426,7 +424,7 @@ router.post('/containers/:id/chown', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    const output = await execInContainer(container, ['chown', owner, filePath]);
+    const output = await execInContainer(container, ['/bin/sh', '-c', `chown ${owner} "${filePath}"`]);
     res.json({ ok: true, path: filePath, owner, output });
   } catch (err) {
     res.status(500).json({ error: `chown failed: ${err.message}` });
