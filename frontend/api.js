@@ -128,9 +128,11 @@ export const api = {
     composeScore:   (yaml)      => request('POST',   '/api/qa/compose/score', { yaml }),
     applyFix:       (id, fixKey)=> request('POST',   `/api/qa/containers/${id}/fix`, { fixKey }),
     diagCmd:        (id, action, target) => request('POST', `/api/qa/containers/${id}/diag`, { action, target }),
-    listFiles:      (id, path)  => request('GET',    `/api/qa/containers/${id}/files?path=${encodeURIComponent(path || '/app')}`),
+    listFiles:      (id, path, sort) => request('GET', `/api/qa/containers/${id}/files?path=${encodeURIComponent(path || '/app')}&sort=${sort || 'default'}`),
     readFile:       (id, path)  => request('POST',   `/api/qa/containers/${id}/read`, { path }),
     writeFile:      (id, path, content) => request('POST', `/api/qa/containers/${id}/write`, { path, content }),
+    chmod:          (id, path, mode)    => request('POST', `/api/qa/containers/${id}/chmod`, { path, mode }),
+    chown:          (id, path, owner)   => request('POST', `/api/qa/containers/${id}/chown`, { path, owner }),
   },
 };
 

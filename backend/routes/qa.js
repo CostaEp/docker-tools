@@ -7,6 +7,8 @@
    GET  /api/qa/containers/:id/files   — List directory contents inside container (ls -la / ls -la -tr)
    POST /api/qa/containers/:id/read    — Read file content inside container
    POST /api/qa/containers/:id/write   — Write/save file content inside container (live edit)
+   POST /api/qa/containers/:id/chmod   — Change permissions (chmod 755/644/777/etc)
+   POST /api/qa/containers/:id/chown   — Change ownership (chown user:group)
    ────────────────────────────────────────────────────────────────────────── */
 
 const express = require('express');
@@ -251,41 +253,48 @@ async function execInContainer(container, cmdArray) {
   });
 }
 
-/* ── Robust ls -la Line Parser ────────────────────────────────────────────── */
+/* ── Bulletproof ls -la Line Parser ───────────────────────────────────────── */
 function parseLsLine(line) {
   const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('total')) return null;
+  if (!trimmed || trimmed.startsWith('total') || trimmed.startsWith('ls:')) return null;
   const parts = trimmed.split(/\s+/);
   if (parts.length < 2) return null;
 
   const perms = parts[0];
-  const isDir = perms.startsWith('d');
+  if (!/^[d-][rwxst-]{9}/.test(perms) && !perms.startsWith('l') && !perms.startsWith('c') && !perms.startsWith('b')) {
+    return null;
+  }
+
+  const isDir     = perms.startsWith('d');
   const isSymlink = perms.startsWith('l');
 
-  // Find filename start index dynamically by looking for time or year field
-  let nameIndex = 8;
+  // Find date/time field (HH:MM or YYYY)
+  let timeIdx = -1;
   for (let i = 4; i < parts.length - 1; i++) {
     if (/^\d{1,2}:\d{2}$/.test(parts[i]) || /^\d{4}$/.test(parts[i])) {
-      nameIndex = i + 1;
+      timeIdx = i;
       break;
     }
   }
 
+  let nameIndex = timeIdx > 0 ? timeIdx + 1 : 8;
+  if (nameIndex >= parts.length) nameIndex = parts.length - 1;
+
   let name = parts.slice(nameIndex).join(' ');
   if (!name) name = parts[parts.length - 1];
 
-  // Strip symlink target for display
   if (isSymlink && name.includes(' -> ')) {
     name = name.split(' -> ')[0];
   }
 
   if (!name || name === '.' || name === '..') return null;
 
-  const size = parts[4] || '0';
   const owner = parts[2] || 'root';
-  const date = parts.slice(Math.max(5, nameIndex - 3), nameIndex).join(' ');
+  const group = parts[3] || 'root';
+  const size  = parts[4] || '0';
+  const date  = timeIdx > 2 ? parts.slice(timeIdx - 2, timeIdx + 1).join(' ') : '—';
 
-  return { name, isDir: isDir || isSymlink, perms, owner, size, date, raw: line };
+  return { name, isDir: isDir || isSymlink, perms, owner: `${owner}:${group}`, size, date, raw: line };
 }
 
 /* ── GET /api/qa/containers/:id/score ─────────────────────────────────── */
@@ -393,6 +402,34 @@ router.get('/containers/:id/files', async (req, res) => {
     res.json({ path: dirPath, items, raw });
   } catch (err) {
     res.status(500).json({ error: `Failed to list directory: ${err.message}` });
+  }
+});
+
+/* ── POST /api/qa/containers/:id/chmod ────────────────────────────────── */
+router.post('/containers/:id/chmod', async (req, res) => {
+  const { path: filePath, mode } = req.body;
+  if (!filePath || !mode) return res.status(400).json({ error: 'path and mode required' });
+
+  const container = docker.getContainer(req.params.id);
+  try {
+    const output = await execInContainer(container, ['chmod', mode, filePath]);
+    res.json({ ok: true, path: filePath, mode, output });
+  } catch (err) {
+    res.status(500).json({ error: `chmod failed: ${err.message}` });
+  }
+});
+
+/* ── POST /api/qa/containers/:id/chown ────────────────────────────────── */
+router.post('/containers/:id/chown', async (req, res) => {
+  const { path: filePath, owner } = req.body;
+  if (!filePath || !owner) return res.status(400).json({ error: 'path and owner required' });
+
+  const container = docker.getContainer(req.params.id);
+  try {
+    const output = await execInContainer(container, ['chown', owner, filePath]);
+    res.json({ ok: true, path: filePath, owner, output });
+  } catch (err) {
+    res.status(500).json({ error: `chown failed: ${err.message}` });
   }
 });
 

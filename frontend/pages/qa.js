@@ -3,7 +3,7 @@
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
    - Interactive 1-Click Fixes & Recommendations Engine
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer with robust ls -la / ls -la -tr parsing, hidden file support, and in-place editor
+   - Container File Explorer with chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -14,6 +14,7 @@ let currentPath = '/app';
 let currentSort = 'default'; // 'default', 'tr', 'S'
 let currentViewMode = 'table'; // 'table' or 'raw'
 let rawLsOutput = '';
+let fetchedItems = [];
 
 export async function renderQA(container) {
   container.innerHTML = `
@@ -84,11 +85,14 @@ export async function renderQA(container) {
       .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
       .file-tree-table th { text-align: left; padding: 6px 10px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
       .file-tree-table td { padding: 6px 10px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; }
-      .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); cursor: pointer; }
+      .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); }
       .file-tree-table tr.dir td { font-weight: 700; color: var(--accent-start); }
 
       .view-toggle-btn { padding: 4px 8px; font-size: 11px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-muted); cursor: pointer; }
       .view-toggle-btn.active { background: var(--accent); color: #fff; border-color: transparent; }
+
+      .file-action-btn { padding: 2px 6px; font-size: 10px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-secondary); cursor: pointer; transition: 0.15s; }
+      .file-action-btn:hover { background: var(--accent-glow); color: var(--accent-start); border-color: var(--accent); }
     </style>
 
     <div class="section-header">
@@ -141,10 +145,10 @@ export async function renderQA(container) {
           <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
         </div>
 
-        <!-- Live File Browser & Editor (with ls -la support) -->
+        <!-- Live File Browser & Editor (with ls -la + chmod / chown support) -->
         <div class="qa-card">
           <div class="qa-card-title" style="justify-content:space-between">
-            <span><i class="ph ph-folder-open"></i> Live File Explorer & Editor (ls -la)</span>
+            <span><i class="ph ph-folder-open"></i> Live File Explorer & Permissions (chmod / chown)</span>
             <span id="qa-file-path-badge" style="font-family:var(--font-mono);font-size:11px;color:var(--accent-start)">/app</span>
           </div>
 
@@ -201,6 +205,8 @@ export async function renderQA(container) {
   window.qaOpenFile          = qaOpenFile;
   window.qaSaveFile          = qaSaveFile;
   window.qaApplyFix          = qaApplyFix;
+  window.qaChmod             = qaChmod;
+  window.qaChown             = qaChown;
 
   // Load container list
   try {
@@ -342,7 +348,7 @@ async function qaRunPing() {
   }
 }
 
-/* ── File Explorer (with ls -la parsing) ─────────────────────────────────── */
+/* ── File Explorer (with ls -la parsing + chmod / chown) ─────────────────── */
 function qaNavUp() {
   let p = currentPath.replace(/\/$/, '');
   const lastIdx = p.lastIndexOf('/');
@@ -364,8 +370,6 @@ function qaSetViewMode(mode) {
   renderFileTreeOutput();
 }
 
-let fetchedItems = [];
-
 async function qaLoadDir() {
   if (!selectedContainerId) { toast('Select a container first', 'error'); return; }
   const path = document.getElementById('qa-dir-input')?.value?.trim() || '/app';
@@ -376,10 +380,7 @@ async function qaLoadDir() {
   treeEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px"><i class="ph ph-spinner"></i> Running ls -la...</div>';
 
   try {
-    // Call API with sort mode
-    const res = await fetch(`/api/qa/containers/${selectedContainerId}/files?path=${encodeURIComponent(path)}&sort=${currentSort}`).then(r => r.json());
-    if (res.error) throw new Error(res.error);
-
+    const res = await api.qa.listFiles(selectedContainerId, path, currentSort);
     fetchedItems = res.items || [];
     rawLsOutput = res.raw || '(empty directory output)';
     renderFileTreeOutput();
@@ -410,25 +411,61 @@ function renderFileTreeOutput() {
     <table class="file-tree-table">
       <thead>
         <tr>
-          <th>Perms</th><th>Owner</th><th>Size</th><th>Date</th><th>Name</th>
+          <th>Perms</th><th>Owner</th><th>Size</th><th>Date</th><th>Name</th><th>Actions</th>
         </tr>
       </thead>
       <tbody>
-        ${fetchedItems.map(item => {
+        ${fetchedItems.map((item, idx) => {
           const icon = item.isDir ? '📁' : '📄';
           const full = `${currentPath.replace(/\/$/, '')}/${item.name}`;
           const isHidden = item.name.startsWith('.');
-          return `<tr class="${item.isDir ? 'dir' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
-            <td>${item.perms || '—'}</td>
-            <td>${item.owner || 'root'}</td>
-            <td>${item.size || '0'}</td>
-            <td>${item.date || '—'}</td>
-            <td><span>${icon}</span> <span style="${isHidden ? 'opacity:0.75;font-style:italic' : ''}">${escapeHtml(item.name)}</span></td>
+          return `<tr class="${item.isDir ? 'dir' : ''}">
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.perms || '—'}</td>
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.owner || 'root'}</td>
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.size || '0'}</td>
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.date || '—'}</td>
+            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">
+              <span>${icon}</span> <span style="${isHidden ? 'opacity:0.75;font-style:italic' : ''}">${escapeHtml(item.name)}</span>
+            </td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <button class="file-action-btn" onclick="event.stopPropagation();window.qaChmod('${full}', '${item.perms}')" title="Change permissions (chmod)">🔑 chmod</button>
+                <button class="file-action-btn" onclick="event.stopPropagation();window.qaChown('${full}', '${item.owner}')" title="Change ownership (chown)">👤 chown</button>
+              </div>
+            </td>
           </tr>`;
         }).join('')}
       </tbody>
     </table>
   `;
+}
+
+async function qaChmod(fullPath, currentPerms) {
+  if (!selectedContainerId) return;
+  const mode = prompt(`Enter new chmod permissions for "${fullPath}" (e.g. 755, 644, 777, +x):`, '755');
+  if (!mode) return;
+
+  try {
+    await api.qa.chmod(selectedContainerId, fullPath, mode.trim());
+    toast(`✅ Changed chmod to "${mode}" for ${fullPath}`, 'success');
+    await qaLoadDir();
+  } catch (err) {
+    toast(`chmod failed: ${err.message}`, 'error');
+  }
+}
+
+async function qaChown(fullPath, currentOwner) {
+  if (!selectedContainerId) return;
+  const owner = prompt(`Enter new chown user:group for "${fullPath}" (e.g. root:root, node:node, 1001:1001):`, currentOwner || 'root:root');
+  if (!owner) return;
+
+  try {
+    await api.qa.chown(selectedContainerId, fullPath, owner.trim());
+    toast(`✅ Changed chown to "${owner}" for ${fullPath}`, 'success');
+    await qaLoadDir();
+  } catch (err) {
+    toast(`chown failed: ${err.message}`, 'error');
+  }
 }
 
 async function qaOpenFile(fullPath, isDir) {
