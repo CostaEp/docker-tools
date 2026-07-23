@@ -5,7 +5,7 @@
    POST /api/qa/containers/:id/fix     — Apply 1-click live fix for a container (memory, cpu, restart policy)
    POST /api/qa/containers/:id/diag    — Execute 1-click diagnostic command (df, free, netstat, ps, env, ping)
    GET  /api/qa/containers/:id/files   — List directory contents inside container (ls -la / ls -la -tr)
-   POST /api/qa/containers/:id/read    — Read file content inside container
+   POST /api/qa/containers/:id/read    — Read file content inside container (base64 encoded read)
    POST /api/qa/containers/:id/write   — Write/save file content inside container (live edit)
    POST /api/qa/containers/:id/chmod   — Change permissions (chmod 755/644/777/etc)
    POST /api/qa/containers/:id/chown   — Change ownership (chown user:group)
@@ -14,6 +14,29 @@
 const express = require('express');
 const router  = express.Router();
 const docker  = require('../docker');
+
+/* ── Helper: exec command inside container ───────────────────────────────── */
+async function execInContainer(container, cmdArray) {
+  const exec = await container.exec({
+    Cmd: cmdArray,
+    AttachStdout: true,
+    AttachStderr: true,
+  });
+
+  const stream = await exec.start({ Tty: false });
+  return new Promise((resolve, reject) => {
+    let output = '';
+    stream.on('data', chunk => {
+      let str = chunk.toString('utf8');
+      if (chunk.length >= 8 && (chunk[0] === 1 || chunk[0] === 2)) {
+        str = chunk.slice(8).toString('utf8');
+      }
+      output += str;
+    });
+    stream.on('end', () => resolve(output.trim()));
+    stream.on('error', err => reject(err));
+  });
+}
 
 /* ── Helper: Fetch Real-Time Container Resource Telemetry ────────────────── */
 async function fetchContainerTelemetry(container) {
@@ -51,6 +74,31 @@ async function fetchContainerTelemetry(container) {
     const diskWriteMB = parseFloat((diskWriteBytes / 1024 / 1024).toFixed(1));
     const diskTotalMB = parseFloat((diskReadMB + diskWriteMB).toFixed(1));
 
+    // Disk Space Usage & Mounted Volumes Storage (via df -h)
+    let rootFsDisk = { used: '0', total: '0', percent: '0%', text: 'N/A' };
+    const volumeDisks = [];
+
+    try {
+      const dfRaw = await execInContainer(container, ['df', '-h']);
+      const dfLines = dfRaw.split('\n');
+      for (const line of dfLines) {
+        const parts = line.trim().split(/\s+/);
+        if (parts.length >= 6) {
+          const mount = parts[5];
+          const total = parts[1];
+          const used  = parts[2];
+          const pct   = parts[4];
+          if (mount === '/') {
+            rootFsDisk = { used, total, percent: pct, text: `${used} / ${total} (${pct})` };
+          } else if (mount !== '/etc/hosts' && mount !== '/etc/resolv.conf' && mount !== '/etc/hostname' && !mount.startsWith('/dev')) {
+            volumeDisks.push({ mount, used, total, percent: pct, text: `${mount}: ${used} / ${total} (${pct})` });
+          }
+        }
+      }
+    } catch (e) {
+      // fallback
+    }
+
     return {
       usageMB,
       maxMB,
@@ -61,9 +109,11 @@ async function fetchContainerTelemetry(container) {
       diskReadMB,
       diskWriteMB,
       diskTotalMB,
+      rootFsDisk,
+      volumeDisks,
     };
   } catch (err) {
-    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
+    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { used: '0', total: '0', percent: '0%', text: 'N/A' }, volumeDisks: [] };
   }
 }
 
@@ -376,29 +426,6 @@ function calculateComposeScore(yamlStr, parsedDoc) {
   return { score: finalScore, grade, deductions, bonuses, totalServices: svcKeys.length };
 }
 
-/* ── Helper: exec command inside container ───────────────────────────────── */
-async function execInContainer(container, cmdArray) {
-  const exec = await container.exec({
-    Cmd: cmdArray,
-    AttachStdout: true,
-    AttachStderr: true,
-  });
-
-  const stream = await exec.start({ Tty: false });
-  return new Promise((resolve, reject) => {
-    let output = '';
-    stream.on('data', chunk => {
-      let str = chunk.toString('utf8');
-      if (chunk.length >= 8 && (chunk[0] === 1 || chunk[0] === 2)) {
-        str = chunk.slice(8).toString('utf8');
-      }
-      output += str;
-    });
-    stream.on('end', () => resolve(output.trim()));
-    stream.on('error', err => reject(err));
-  });
-}
-
 /* ── Bulletproof ls -la Line Parser ───────────────────────────────────────── */
 function parseLsLine(line) {
   const trimmed = line.trim();
@@ -595,7 +622,9 @@ router.post('/containers/:id/read', async (req, res) => {
 
   const container = docker.getContainer(req.params.id);
   try {
-    const content = await execInContainer(container, ['cat', filePath]);
+    // Bulletproof base64 read: handles all file types, newlines, binary, quotes, spaces
+    const rawB64 = await execInContainer(container, ['/bin/sh', '-c', `cat "${filePath}" | base64`]);
+    const content = Buffer.from(rawB64.replace(/\s+/g, ''), 'base64').toString('utf8');
     res.json({ path: filePath, content });
   } catch (err) {
     res.status(500).json({ error: `Failed to read file: ${err.message}` });

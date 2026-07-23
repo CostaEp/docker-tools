@@ -2,12 +2,12 @@
    Features:
    - 100% Full-Width Single Stack Vertical Layout (No side-by-side cramped columns)
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
-   - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Disk Storage I/O SVG curves updated live)
+   - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Storage Root FS + Volumes SVG curves updated live)
    - Smart Dynamic Sizing Recommendation Engine (Peak RAM + 50% safety buffer)
    - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
    - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
    - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer with chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
+   - Container File Explorer with base64 text/config file reader, chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -226,16 +226,19 @@ export async function renderQA(container) {
             </div>
           </div>
 
-          <!-- Disk Storage I/O Sparkline Chart -->
+          <!-- Disk Storage I/O Sparkline Chart & Volume Disk Space -->
           <div class="sparkline-card">
             <div class="sparkline-header">
-              <span class="sparkline-title"><i class="ph ph-hard-drive"></i> Storage & Disk I/O Curve</span>
+              <span class="sparkline-title"><i class="ph ph-hard-drive"></i> Storage Space & Disk I/O</span>
               <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#f59e0b" id="qa-chart-disk-text">0.0 MB</span>
             </div>
             <div id="qa-chart-disk-svg"></div>
             <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono)">
               <span id="qa-chart-disk-read">Read: 0 MB</span>
               <span id="qa-chart-disk-write" style="color:#f59e0b">Write: 0 MB</span>
+            </div>
+            <div style="font-size:10px;color:var(--accent-start);margin-top:4px;font-family:var(--font-mono);word-break:break-all" id="qa-chart-volume-breakdown">
+              Root FS: 0 / 0
             </div>
           </div>
         </div>
@@ -311,12 +314,12 @@ export async function renderQA(container) {
         </div>
 
         <!-- File Editor -->
-        <div id="qa-editor-wrap" style="display:none">
+        <div id="qa-editor-wrap" style="display:none;margin-top:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
             <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
           </div>
-          <textarea class="form-control" id="qa-file-editor" style="min-height:200px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
+          <textarea class="form-control" id="qa-file-editor" style="min-height:220px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
         </div>
 
       </div>
@@ -427,7 +430,7 @@ function renderSparklineSvg(points, color = '#00c6ff', height = 45, width = 360)
 async function pollTelemetry(id) {
   try {
     const data = await api.qa.containerScore(id);
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { text: 'N/A' }, volumeDisks: [] };
 
     ramHistory.push(t.usageMB);
     if (ramHistory.length > 20) ramHistory.shift();
@@ -451,6 +454,7 @@ async function pollTelemetry(id) {
     const diskSvg   = document.getElementById('qa-chart-disk-svg');
     const diskRead  = document.getElementById('qa-chart-disk-read');
     const diskWrite = document.getElementById('qa-chart-disk-write');
+    const volEl     = document.getElementById('qa-chart-volume-breakdown');
 
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
@@ -460,10 +464,19 @@ async function pollTelemetry(id) {
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
 
-    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB`;
+    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB Total I/O`;
     if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
     if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
     if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
+
+    if (volEl) {
+      let volText = `Root FS: ${t.rootFsDisk?.text || 'N/A'}`;
+      if (t.volumeDisks && t.volumeDisks.length > 0) {
+        const vStr = t.volumeDisks.map(v => `${v.text}`).join(' | ');
+        volText += ` | Volumes: ${vStr}`;
+      }
+      volEl.textContent = volText;
+    }
 
   } catch (err) {
     // Ignore silent polling errors
@@ -482,7 +495,7 @@ async function loadScore(id) {
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0 };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { text: 'N/A' }, volumeDisks: [] };
     currentFullYaml = data.fullComposeYaml || '';
     if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
     if (telemetryCard) telemetryCard.style.display = 'block';
@@ -504,6 +517,7 @@ async function loadScore(id) {
     const diskSvg   = document.getElementById('qa-chart-disk-svg');
     const diskRead  = document.getElementById('qa-chart-disk-read');
     const diskWrite = document.getElementById('qa-chart-disk-write');
+    const volEl     = document.getElementById('qa-chart-volume-breakdown');
 
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
@@ -513,10 +527,19 @@ async function loadScore(id) {
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
 
-    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB`;
+    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB Total I/O`;
     if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
     if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
     if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
+
+    if (volEl) {
+      let volText = `Root FS: ${t.rootFsDisk?.text || 'N/A'}`;
+      if (t.volumeDisks && t.volumeDisks.length > 0) {
+        const vStr = t.volumeDisks.map(v => `${v.text}`).join(' | ');
+        volText += ` | Volumes: ${vStr}`;
+      }
+      volEl.textContent = volText;
+    }
 
     currentDeductionsMap = {};
     (data.deductions || []).forEach(d => { currentDeductionsMap[d.key] = d; });
@@ -769,7 +792,7 @@ function formatFileName(name, isDir) {
     return `<span class="file-name exec-file">⚡ ${escapeHtml(name)}</span>`;
   }
 
-  if (['env', 'pem', 'key', 'json', 'yml', 'yaml', 'conf', 'config'].includes(ext) || name.includes('config') || name === '.env' || name === 'Dockerfile') {
+  if (['env', 'pem', 'key', 'json', 'yml', 'yaml', 'conf', 'config', 'html', 'css', 'ts', 'go', 'rs', 'md', 'txt', 'log'].includes(ext) || name.includes('config') || name === '.env' || name === 'Dockerfile') {
     return `<span class="file-name config-file">🔒 ${escapeHtml(name)}</span>`;
   }
 
