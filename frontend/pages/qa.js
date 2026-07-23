@@ -3,11 +3,9 @@
    - 100% Full-Width Single Stack Vertical Layout (No side-by-side cramped columns)
    - Redesigned Dark Glassmorphism Container Quality Scorecard & Grade
    - Interactive Live Resource Telemetry Sparklines (RAM, CPU, and Storage Root FS + Volumes SVG curves updated live)
-   - Smart Dynamic Sizing Recommendation Engine (Peak RAM + 50% safety buffer)
-   - Full Production-Ready docker-compose.yml Generator & Copy Capabilities
-   - Interactive 1-Click Fixes & YAML Snippet Diff Viewer
-   - 1-Click Diagnostics Workbench (df, free, ports, ps, env, ping)
-   - Container File Explorer with base64 text/config file reader, chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
+   - Clear Storage Breakdown: Container Write Layer Size (SizeRw), Host Disk Free/Used, and Volume Space with Progress Bars
+   - Roomy Large File Explorer (max-height: 600px) & File Editor (min-height: 480px)
+   - Base64 text/config file reader, chmod / chown permissions controls, robust ls -la parsing, hidden file support, and in-place editor
    ────────────────────────────────────────────────────────────────────────── */
 
 import api from '/api.js';
@@ -95,6 +93,10 @@ export async function renderQA(container) {
       .sparkline-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
       .sparkline-title { font-size: 11px; font-weight: 800; color: var(--text-muted); text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
 
+      /* Storage Progress Bar Styling */
+      .storage-bar-bg { background: rgba(255,255,255,0.08); border-radius: 6px; height: 8px; width: 100%; overflow: hidden; margin: 6px 0; }
+      .storage-bar-fill { background: linear-gradient(90deg, #f59e0b, #ef4444); height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+
       /* Diag buttons */
       .diag-btn-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin-bottom: 14px; }
       .diag-btn {
@@ -111,12 +113,12 @@ export async function renderQA(container) {
         color: #e6edf3; min-height: 180px; max-height: 340px; overflow: auto; white-space: pre-wrap;
       }
       
-      /* File explorer styling */
+      /* File explorer styling (Roomy & Large: max-height 600px) */
       .file-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
       .file-tree-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: var(--font-mono); }
       .file-tree-table th { text-align: left; padding: 8px 12px; color: var(--text-muted); font-size: 11px; border-bottom: 1px solid var(--border); font-weight: 600; }
       .file-tree-table td { padding: 8px 12px; border-bottom: 1px solid var(--border)33; color: var(--text-secondary); white-space: nowrap; vertical-align: middle; }
-      .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); }
+      .file-tree-table tr:hover td { background: var(--bg-hover); color: var(--text-primary); cursor: pointer; }
       
       .file-tree-table tr.is-777 td { background: rgba(239, 68, 68, 0.08); }
       .file-tree-table tr.is-777:hover td { background: rgba(239, 68, 68, 0.15); }
@@ -195,7 +197,7 @@ export async function renderQA(container) {
       <!-- CARD 2: Real-Time Resource Telemetry & Live Sparkline Curves (RAM, CPU, Storage) -->
       <div class="qa-card" id="qa-telemetry-card" style="display:none">
         <div class="qa-card-title" style="justify-content:space-between">
-          <span><i class="ph ph-chart-line-up"></i> Real-Time Resource Telemetry Curves (RAM, CPU & Storage I/O)</span>
+          <span><i class="ph ph-chart-line-up"></i> Real-Time Resource Telemetry Curves (RAM, CPU & Storage Space)</span>
           <span style="font-size:10px;color:var(--accent-start);background:var(--accent-glow);padding:2px 8px;border-radius:6px;font-weight:700">● LIVE MONITORING (3s)</span>
         </div>
 
@@ -226,19 +228,23 @@ export async function renderQA(container) {
             </div>
           </div>
 
-          <!-- Disk Storage I/O Sparkline Chart & Volume Disk Space -->
+          <!-- Clear Disk Storage Space & Volumes Panel -->
           <div class="sparkline-card">
             <div class="sparkline-header">
-              <span class="sparkline-title"><i class="ph ph-hard-drive"></i> Storage Space & Disk I/O</span>
-              <span style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:#f59e0b" id="qa-chart-disk-text">0.0 MB</span>
+              <span class="sparkline-title"><i class="ph ph-hard-drive"></i> Storage Space & Volumes</span>
+              <span style="font-family:var(--font-mono);font-size:11px;font-weight:700;color:#f59e0b" id="qa-container-rw-size">Container Layer: 0 MB</span>
             </div>
-            <div id="qa-chart-disk-svg"></div>
-            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono)">
-              <span id="qa-chart-disk-read">Read: 0 MB</span>
-              <span id="qa-chart-disk-write" style="color:#f59e0b">Write: 0 MB</span>
+            
+            <div class="storage-bar-bg">
+              <div class="storage-bar-fill" id="qa-rootfs-bar-fill" style="width: 5%"></div>
             </div>
-            <div style="font-size:10px;color:var(--accent-start);margin-top:4px;font-family:var(--font-mono);word-break:break-all" id="qa-chart-volume-breakdown">
-              Root FS: 0 / 0
+
+            <div style="font-size:11px;font-weight:600;color:var(--text-primary);margin-top:4px;font-family:var(--font-mono)" id="qa-rootfs-summary">
+              Root FS: 0 / 0 (0% used)
+            </div>
+
+            <div style="font-size:10px;color:var(--text-muted);margin-top:6px;font-family:var(--font-mono);line-height:1.4" id="qa-volume-breakdown-list">
+              No extra volume mounts attached.
             </div>
           </div>
         </div>
@@ -278,7 +284,7 @@ export async function renderQA(container) {
         <div class="qa-console" id="qa-diag-console">Select a diagnostic button to execute instant command...</div>
       </div>
 
-      <!-- CARD 5: Live File Explorer & Permissions Manager -->
+      <!-- CARD 5: Live File Explorer & Permissions Manager (Roomy Large View) -->
       <div class="qa-card">
         <div class="qa-card-title" style="justify-content:space-between">
           <span><i class="ph ph-folder-open"></i> Live File Explorer (Colorized 777 & Perms)</span>
@@ -308,18 +314,18 @@ export async function renderQA(container) {
           </div>
         </div>
 
-        <!-- File Tree / Raw Output Container -->
-        <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px;max-height:300px">
+        <!-- File Tree / Raw Output Container (Expanded to max-height 600px for maximum viewing comfort) -->
+        <div class="file-tree" id="qa-file-tree" style="margin-bottom:12px;max-height:600px;overflow:auto">
           <div style="color:var(--text-muted);font-size:12px;padding:8px">Enter directory path and click Open Dir.</div>
         </div>
 
-        <!-- File Editor -->
-        <div id="qa-editor-wrap" style="display:none;margin-top:14px">
+        <!-- File Editor (Expanded to min-height 480px) -->
+        <div id="qa-editor-wrap" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
             <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
             <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
           </div>
-          <textarea class="form-control" id="qa-file-editor" style="min-height:220px;font-family:var(--font-mono);font-size:11px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
+          <textarea class="form-control" id="qa-file-editor" style="min-height:480px;font-family:var(--font-mono);font-size:12px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
         </div>
 
       </div>
@@ -426,11 +432,11 @@ function renderSparklineSvg(points, color = '#00c6ff', height = 45, width = 360)
   `;
 }
 
-/* ── Poll Telemetry for Live Curves ──────────────────────────────────────── */
+/* ── Poll Telemetry for Live Curves & Clear Storage Info ─────────────────── */
 async function pollTelemetry(id) {
   try {
     const data = await api.qa.containerScore(id);
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { text: 'N/A' }, volumeDisks: [] };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, cpuPercent: 0, recMemMB: 256, containerRwMB: 0, rootFsDisk: { used: '0', avail: '0', total: '0', percent: '0%' }, volumeDisks: [] };
 
     ramHistory.push(t.usageMB);
     if (ramHistory.length > 20) ramHistory.shift();
@@ -438,10 +444,7 @@ async function pollTelemetry(id) {
     cpuHistory.push(t.cpuPercent);
     if (cpuHistory.length > 20) cpuHistory.shift();
 
-    diskHistory.push(t.diskTotalMB);
-    if (diskHistory.length > 20) diskHistory.shift();
-
-    // Update Sparkline Charts
+    // Update Telemetry Elements
     const ramText = document.getElementById('qa-chart-ram-text');
     const ramSvg  = document.getElementById('qa-chart-ram-svg');
     const ramPeak = document.getElementById('qa-chart-ram-peak');
@@ -450,11 +453,10 @@ async function pollTelemetry(id) {
     const cpuText = document.getElementById('qa-chart-cpu-text');
     const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
 
-    const diskText  = document.getElementById('qa-chart-disk-text');
-    const diskSvg   = document.getElementById('qa-chart-disk-svg');
-    const diskRead  = document.getElementById('qa-chart-disk-read');
-    const diskWrite = document.getElementById('qa-chart-disk-write');
-    const volEl     = document.getElementById('qa-chart-volume-breakdown');
+    const rwSizeEl   = document.getElementById('qa-container-rw-size');
+    const barFillEl  = document.getElementById('qa-rootfs-bar-fill');
+    const summaryEl  = document.getElementById('qa-rootfs-summary');
+    const listEl     = document.getElementById('qa-volume-breakdown-list');
 
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
@@ -464,18 +466,22 @@ async function pollTelemetry(id) {
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
 
-    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB Total I/O`;
-    if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
-    if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
-    if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
+    // Clear Storage Display
+    if (rwSizeEl)  rwSizeEl.textContent  = `Container Layer: ${t.containerRwMB || 0} MB`;
+    if (barFillEl) barFillEl.style.width = t.rootFsDisk?.percent || '5%';
+    if (summaryEl) summaryEl.textContent = `Host Disk: ${t.rootFsDisk?.used || '0'} used / ${t.rootFsDisk?.avail || '0'} free (${t.rootFsDisk?.total || '0'} total)`;
 
-    if (volEl) {
-      let volText = `Root FS: ${t.rootFsDisk?.text || 'N/A'}`;
+    if (listEl) {
       if (t.volumeDisks && t.volumeDisks.length > 0) {
-        const vStr = t.volumeDisks.map(v => `${v.text}`).join(' | ');
-        volText += ` | Volumes: ${vStr}`;
+        listEl.innerHTML = t.volumeDisks.map(v => `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+            <span style="color:#00c6ff;font-weight:700">📁 ${escapeHtml(v.mount)}:</span>
+            <span>${v.used} used / ${v.avail} free (${v.total})</span>
+          </div>
+        `).join('');
+      } else {
+        listEl.textContent = 'No extra volume mounts attached.';
       }
-      volEl.textContent = volText;
     }
 
   } catch (err) {
@@ -495,16 +501,15 @@ async function loadScore(id) {
   try {
     const data = await api.qa.containerScore(id);
     const score = data.score;
-    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { text: 'N/A' }, volumeDisks: [] };
+    const t = data.telemetry || { usageMB: 0, maxMB: 0, limitMB: 0, cpuPercent: 0, recMemMB: 256, containerRwMB: 0, rootFsDisk: { used: '0', avail: '0', total: '0', percent: '0%' }, volumeDisks: [] };
     currentFullYaml = data.fullComposeYaml || '';
     if (copyTopBtn) copyTopBtn.style.display = 'inline-flex';
     if (telemetryCard) telemetryCard.style.display = 'block';
 
     ramHistory  = [t.usageMB];
     cpuHistory  = [t.cpuPercent];
-    diskHistory = [t.diskTotalMB];
 
-    // Initial render of Live Sparklines
+    // Initial render of Live Telemetry & Clear Storage Display
     const ramText = document.getElementById('qa-chart-ram-text');
     const ramSvg  = document.getElementById('qa-chart-ram-svg');
     const ramPeak = document.getElementById('qa-chart-ram-peak');
@@ -513,11 +518,10 @@ async function loadScore(id) {
     const cpuText = document.getElementById('qa-chart-cpu-text');
     const cpuSvg  = document.getElementById('qa-chart-cpu-svg');
 
-    const diskText  = document.getElementById('qa-chart-disk-text');
-    const diskSvg   = document.getElementById('qa-chart-disk-svg');
-    const diskRead  = document.getElementById('qa-chart-disk-read');
-    const diskWrite = document.getElementById('qa-chart-disk-write');
-    const volEl     = document.getElementById('qa-chart-volume-breakdown');
+    const rwSizeEl   = document.getElementById('qa-container-rw-size');
+    const barFillEl  = document.getElementById('qa-rootfs-bar-fill');
+    const summaryEl  = document.getElementById('qa-rootfs-summary');
+    const listEl     = document.getElementById('qa-volume-breakdown-list');
 
     if (ramText) ramText.textContent = `${t.usageMB} MB`;
     if (ramPeak) ramPeak.textContent = `Peak: ${t.maxMB} MB`;
@@ -527,18 +531,21 @@ async function loadScore(id) {
     if (cpuText) cpuText.textContent = `${t.cpuPercent}%`;
     if (cpuSvg)  cpuSvg.innerHTML    = renderSparklineSvg(cpuHistory, '#22c55e');
 
-    if (diskText)  diskText.textContent  = `${t.diskTotalMB} MB Total I/O`;
-    if (diskRead)  diskRead.textContent  = `Read: ${t.diskReadMB} MB`;
-    if (diskWrite) diskWrite.textContent = `Write: ${t.diskWriteMB} MB`;
-    if (diskSvg)   diskSvg.innerHTML     = renderSparklineSvg(diskHistory, '#f59e0b');
+    if (rwSizeEl)  rwSizeEl.textContent  = `Container Layer: ${t.containerRwMB || 0} MB`;
+    if (barFillEl) barFillEl.style.width = t.rootFsDisk?.percent || '5%';
+    if (summaryEl) summaryEl.textContent = `Host Disk: ${t.rootFsDisk?.used || '0'} used / ${t.rootFsDisk?.avail || '0'} free (${t.rootFsDisk?.total || '0'} total)`;
 
-    if (volEl) {
-      let volText = `Root FS: ${t.rootFsDisk?.text || 'N/A'}`;
+    if (listEl) {
       if (t.volumeDisks && t.volumeDisks.length > 0) {
-        const vStr = t.volumeDisks.map(v => `${v.text}`).join(' | ');
-        volText += ` | Volumes: ${vStr}`;
+        listEl.innerHTML = t.volumeDisks.map(v => `
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:3px">
+            <span style="color:#00c6ff;font-weight:700">📁 ${escapeHtml(v.mount)}:</span>
+            <span>${v.used} used / ${v.avail} free (${v.total})</span>
+          </div>
+        `).join('');
+      } else {
+        listEl.textContent = 'No extra volume mounts attached.';
       }
-      volEl.textContent = volText;
     }
 
     currentDeductionsMap = {};
@@ -833,12 +840,12 @@ function renderFileTreeOutput() {
           const full = `${currentPath.replace(/\/$/, '')}/${item.name}`;
           const is777 = (item.perms || '').includes('rwxrwxrwx');
           
-          return `<tr class="${item.isDir ? 'dir' : ''} ${is777 ? 'is-777' : ''}">
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${formatPermsBadge(item.perms)}</td>
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.owner || 'root'}</td>
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.size || '0'}</td>
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${item.date || '—'}</td>
-            <td onclick="window.qaOpenFile('${full}', ${item.isDir})">${formatFileName(item.name, item.isDir)}</td>
+          return `<tr class="${item.isDir ? 'dir' : ''} ${is777 ? 'is-777' : ''}" onclick="window.qaOpenFile('${full}', ${item.isDir})">
+            <td>${formatPermsBadge(item.perms)}</td>
+            <td>${item.owner || 'root'}</td>
+            <td>${item.size || '0'}</td>
+            <td>${item.date || '—'}</td>
+            <td>${formatFileName(item.name, item.isDir)}</td>
             <td>
               <div style="display:flex;gap:4px">
                 <button class="file-action-btn" onclick="event.stopPropagation();window.qaChmod('${full}', '${item.perms}')" title="Change permissions (chmod)">🔑 chmod</button>

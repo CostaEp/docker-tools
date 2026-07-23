@@ -74,8 +74,17 @@ async function fetchContainerTelemetry(container) {
     const diskWriteMB = parseFloat((diskWriteBytes / 1024 / 1024).toFixed(1));
     const diskTotalMB = parseFloat((diskReadMB + diskWriteMB).toFixed(1));
 
+    // Container RW Layer size & root filesystem size via inspect({ size: true })
+    let containerRwMB = 0;
+    let containerRootFsMB = 0;
+    try {
+      const sizeInfo = await container.inspect({ size: true });
+      if (sizeInfo.SizeRw) containerRwMB = Math.round(sizeInfo.SizeRw / 1024 / 1024);
+      if (sizeInfo.SizeRootFs) containerRootFsMB = Math.round(sizeInfo.SizeRootFs / 1024 / 1024);
+    } catch (e) {}
+
     // Disk Space Usage & Mounted Volumes Storage (via df -h)
-    let rootFsDisk = { used: '0', total: '0', percent: '0%', text: 'N/A' };
+    let rootFsDisk = { used: '0', avail: '0', total: '0', percent: '0%', text: 'N/A' };
     const volumeDisks = [];
 
     try {
@@ -87,11 +96,16 @@ async function fetchContainerTelemetry(container) {
           const mount = parts[5];
           const total = parts[1];
           const used  = parts[2];
+          const avail = parts[3];
           const pct   = parts[4];
+
           if (mount === '/') {
-            rootFsDisk = { used, total, percent: pct, text: `${used} / ${total} (${pct})` };
-          } else if (mount !== '/etc/hosts' && mount !== '/etc/resolv.conf' && mount !== '/etc/hostname' && !mount.startsWith('/dev')) {
-            volumeDisks.push({ mount, used, total, percent: pct, text: `${mount}: ${used} / ${total} (${pct})` });
+            rootFsDisk = { used, avail, total, percent: pct, text: `Used: ${used} | Free: ${avail} | Total: ${total} (${pct} used)` };
+          } else if (
+            mount !== '/etc/hosts' && mount !== '/etc/resolv.conf' && mount !== '/etc/hostname' &&
+            !mount.startsWith('/dev') && !mount.startsWith('/proc') && !mount.startsWith('/sys') && !mount.startsWith('/run')
+          ) {
+            volumeDisks.push({ mount, used, avail, total, percent: pct, text: `${mount}: ${used} used / ${avail} free (${total} total)` });
           }
         }
       }
@@ -109,11 +123,13 @@ async function fetchContainerTelemetry(container) {
       diskReadMB,
       diskWriteMB,
       diskTotalMB,
+      containerRwMB,
+      containerRootFsMB,
       rootFsDisk,
       volumeDisks,
     };
   } catch (err) {
-    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, rootFsDisk: { used: '0', total: '0', percent: '0%', text: 'N/A' }, volumeDisks: [] };
+    return { usageMB: 0, maxMB: 0, limitMB: 0, recMemMB: 512, cpuPercent: 0, cpusCount: 1, diskReadMB: 0, diskWriteMB: 0, diskTotalMB: 0, containerRwMB: 0, containerRootFsMB: 0, rootFsDisk: { used: '0', avail: '0', total: '0', percent: '0%', text: 'N/A' }, volumeDisks: [] };
   }
 }
 
