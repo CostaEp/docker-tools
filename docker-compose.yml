@@ -1,8 +1,11 @@
 services:
 
-  # ── Gateway — Traefik v3 API Gateway (Single Entrypoint on Port 9090) ────
+  # ── Gateway — Traefik v3 API Gateway ─────────────────────────────────
   mobydock-gateway:
-    image: traefik:v3.0
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    image: docker-tools-gateway:2.3.0
     container_name: mobydock-gateway
     command:
       - "--api.insecure=true"
@@ -13,8 +16,6 @@ services:
     ports:
       - "9090:80"      # Main Application Entrypoint & Proxy Gateway
       - "8080:8080"    # Traefik Visual API Gateway Dashboard
-    volumes:
-      - ./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro
     depends_on:
       mobydock-core:
         condition: service_healthy
@@ -30,12 +31,12 @@ services:
       com.mobydock.version: "2.3.0"
       com.mobydock.managed-by: "docker-compose"
 
-  # ── Core — containers, images, networks, volumes, stats, compose, k8s, UI ──
+  # ── Core — Containers, Images, Networks, Volumes, Stats, Compose, K8s, UI ──
   mobydock-core:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: docker-tools-mobydock:2.3.0
+      dockerfile: ./services/core/Dockerfile
+    image: docker-tools-core:2.3.0
     container_name: mobydock-core
     expose:
       - "3001"
@@ -59,12 +60,12 @@ services:
       com.mobydock.version: "2.3.0"
       com.mobydock.managed-by: "docker-compose"
 
-  # ── QA — quality scoring, telemetry, diagnostics ─────────────────────
+  # ── QA — Quality scoring, telemetry, diagnostics ─────────────────────
   mobydock-qa:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: docker-tools-mobydock:2.3.0
+      dockerfile: ./services/qa/Dockerfile
+    image: docker-tools-qa:2.3.0
     container_name: mobydock-qa
     expose:
       - "3002"
@@ -88,12 +89,12 @@ services:
       com.mobydock.version: "2.3.0"
       com.mobydock.managed-by: "docker-compose"
 
-  # ── Files — file explorer, chmod, chown, read, write ─────────────────
+  # ── Files — File explorer, chmod, chown, read, write ─────────────────
   mobydock-files:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: docker-tools-mobydock:2.3.0
+      dockerfile: ./services/files/Dockerfile
+    image: docker-tools-files:2.3.0
     container_name: mobydock-files
     expose:
       - "3003"
@@ -121,8 +122,8 @@ services:
   mobydock-terminal:
     build:
       context: .
-      dockerfile: Dockerfile
-    image: docker-tools-mobydock:2.3.0
+      dockerfile: ./services/terminal/Dockerfile
+    image: docker-tools-terminal:2.3.0
     container_name: mobydock-terminal
     expose:
       - "3004"
@@ -141,7 +142,7 @@ services:
       start_period: 15s
     labels:
       com.mobydock.component: "terminal"
-      com.mobydock.version: "2.2.0"
+      com.mobydock.version: "2.3.0"
       com.mobydock.managed-by: "docker-compose"
 
 volumes:

@@ -1,0 +1,44 @@
+# Traefik v3 Dynamic Routing Configuration for MobyDock Microservices
+http:
+  routers:
+    # Terminal WebSocket (/socket.io/*)
+    terminal-router:
+      rule: "PathPrefix(`/socket.io`)"
+      service: terminal-service
+      priority: 20
+
+    # QA Scoring & Telemetry (/api/qa/*)
+    qa-router:
+      rule: "PathPrefix(`/api/qa`)"
+      service: qa-service
+      priority: 10
+
+    # File Explorer & Permissions (/api/files/*)
+    files-router:
+      rule: "PathPrefix(`/api/files`)"
+      service: files-service
+      priority: 10
+
+    # Core REST API & Static UI (/*)
+    core-router:
+      rule: "PathPrefix(`/`)"
+      service: core-service
+      priority: 1
+
+  services:
+    core-service:
+      loadBalancer:
+        servers:
+          - url: "http://mobydock-core:3001"
+    qa-service:
+      loadBalancer:
+        servers:
+          - url: "http://mobydock-qa:3002"
+    files-service:
+      loadBalancer:
+        servers:
+          - url: "http://mobydock-files:3003"
+    terminal-service:
+      loadBalancer:
+        servers:
+          - url: "http://mobydock-terminal:3004"
