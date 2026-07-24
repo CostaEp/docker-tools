@@ -312,24 +312,13 @@ router.post('/:id/processes/kill', async (req, res) => {
 
     const sig = signal || 'SIGKILL';
 
-    // Execute kill inside container
-    try {
-      const exec = await container.exec({
-        Cmd: ['kill', sig === 'SIGKILL' ? '-9' : '-15', pid.toString()],
-        AttachStdout: true,
-        AttachStderr: true,
-      });
-      await exec.start({ hijack: true, stdin: false });
-    } catch (e) {
-      // If exec kill failed, kill container directly
-      await container.kill({ signal: sig }).catch(() => {});
-    }
-
-    // If PID is main process or host PID representation, issue container kill/restart to ensure real termination
-    if (pid.toString() === '1' || pid.toString() === '72850' || pid.toString() === '79403' || info.State.Running) {
-      // Force kill container if user killed main PID
-      await container.kill({ signal: 'SIGKILL' }).catch(() => {});
-    }
+    // Execute kill inside container PID namespace
+    const exec = await container.exec({
+      Cmd: ['kill', sig === 'SIGKILL' ? '-9' : '-15', pid.toString()],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    await exec.start({ hijack: true, stdin: false });
 
     // Record audit event in Watchdog log stream
     db.addWatchdogLog({
@@ -337,10 +326,10 @@ router.post('/:id/processes/kill', async (req, res) => {
       containerName: name,
       action: `Process Terminated (${sig})`,
       severity: 'WARNING',
-      message: `User issued ${sig} to PID ${pid} in container '${name}'. Process killed & logged to Watchdog stream.`,
+      message: `User issued ${sig} to PID ${pid} inside container '${name}'.`,
     });
 
-    res.json({ success: true, pid, signal: sig, message: `Successfully terminated process PID ${pid}` });
+    res.json({ success: true, pid, signal: sig, message: `Successfully sent ${sig} to PID ${pid}` });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to kill process' });
   }

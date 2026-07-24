@@ -41,11 +41,8 @@ async function checkAndHealContainers() {
       }
 
       if (isExited && settings.autoRestartExited) {
-        // Check if container was explicitly stopped by user or crashed
-        if (!status.includes('Exited (0)')) { // Non-zero exit code means crash
-          await healContainer(id, name, 'Crash Recovery (Exited Non-Zero)', `Container exited abnormally: "${status}". Triggering auto-restart recovery.`);
-          continue;
-        }
+        await healContainer(id, name, 'Crash Recovery (Exited)', `Container status was "${status}". Triggering Watchdog auto-restart recovery.`);
+        continue;
       }
 
       // ── Rule 2: Memory Spike Protection (>95% threshold) ──────────────
