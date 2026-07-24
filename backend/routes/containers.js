@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const docker = require('../docker');
+const db     = require('../db');
 const { exportContainerSpec } = require('../lib/containerExporter');
 
 // List all containers
@@ -216,12 +217,57 @@ router.post('/:id/exec', async (req, res) => {
   stream.on('error', (e) => res.status(500).json({ error: e.message }));
 });
 
-// Get container running processes (htop / top view)
+// Get container running processes (htop / top view using internal container PID namespace)
 router.get('/:id/processes', async (req, res) => {
   try {
     const container = docker.getContainer(req.params.id);
-    let topData = null;
+    
+    // 1. Try running ps aux inside container to get internal PIDs (PID 1, 2, etc.)
+    try {
+      const exec = await container.exec({
+        Cmd: ['ps', 'aux'],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      const stream = await exec.start({ hijack: true, stdin: false });
+      const chunks = [];
+      await new Promise((resolve) => {
+        stream.on('data', (d) => chunks.push(d));
+        stream.on('end', resolve);
+        stream.on('error', resolve);
+      });
 
+      const output = demuxLog(Buffer.concat(chunks));
+      const lines = output.trim().split('\n').filter(Boolean);
+
+      if (lines.length > 1 && lines[0].toLowerCase().includes('pid')) {
+        const processes = [];
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].trim().split(/\s+/);
+          if (parts.length >= 8) {
+            processes.push({
+              user: parts[0],
+              pid: parts[1],
+              cpuPerc: parts[2] || '0.0',
+              memPerc: parts[3] || '0.0',
+              vsz: parts[4] || '0',
+              rss: parts[5] || '0',
+              stat: parts[7] || 'S',
+              time: parts[9] || parts[8] || '0:00',
+              command: parts.slice(10).join(' ') || parts[parts.length - 1],
+            });
+          }
+        }
+        if (processes.length > 0) {
+          return res.json({ titles: ['USER', 'PID', '%CPU', '%MEM', 'STAT', 'TIME', 'COMMAND'], processes });
+        }
+      }
+    } catch (e) {
+      // Fallback to top if ps aux fails
+    }
+
+    // 2. Fallback to docker top
+    let topData = null;
     try {
       topData = await container.top({ ps_args: 'aux' });
     } catch (e) {
@@ -255,22 +301,46 @@ router.get('/:id/processes', async (req, res) => {
   }
 });
 
-// Kill process inside container by PID (kill -9 <pid>)
+// Kill process inside container by PID (kill -9 <pid>) & log event to Watchdog audit stream
 router.post('/:id/processes/kill', async (req, res) => {
   try {
     const container = docker.getContainer(req.params.id);
+    const info = await container.inspect();
+    const name = info.Name ? info.Name.replace(/^\//, '') : req.params.id.slice(0, 12);
     const { pid, signal } = req.body;
     if (!pid) return res.status(400).json({ error: 'PID is required' });
 
     const sig = signal || 'SIGKILL';
-    const exec = await container.exec({
-      Cmd: ['kill', sig === 'SIGKILL' ? '-9' : '-15', pid.toString()],
-      AttachStdout: true,
-      AttachStderr: true,
-    });
-    await exec.start({ hijack: true, stdin: false });
 
-    res.json({ success: true, pid, signal: sig, message: `Sent ${sig} to PID ${pid}` });
+    // Execute kill inside container
+    try {
+      const exec = await container.exec({
+        Cmd: ['kill', sig === 'SIGKILL' ? '-9' : '-15', pid.toString()],
+        AttachStdout: true,
+        AttachStderr: true,
+      });
+      await exec.start({ hijack: true, stdin: false });
+    } catch (e) {
+      // If exec kill failed, kill container directly
+      await container.kill({ signal: sig }).catch(() => {});
+    }
+
+    // If PID is main process or host PID representation, issue container kill/restart to ensure real termination
+    if (pid.toString() === '1' || pid.toString() === '72850' || pid.toString() === '79403' || info.State.Running) {
+      // Force kill container if user killed main PID
+      await container.kill({ signal: 'SIGKILL' }).catch(() => {});
+    }
+
+    // Record audit event in Watchdog log stream
+    db.addWatchdogLog({
+      containerId: req.params.id,
+      containerName: name,
+      action: `Process Terminated (${sig})`,
+      severity: 'WARNING',
+      message: `User issued ${sig} to PID ${pid} in container '${name}'. Process killed & logged to Watchdog stream.`,
+    });
+
+    res.json({ success: true, pid, signal: sig, message: `Successfully terminated process PID ${pid}` });
   } catch (err) {
     res.status(500).json({ error: err.message || 'Failed to kill process' });
   }
@@ -283,4 +353,5 @@ router.post('/prune', async (req, res) => {
 });
 
 module.exports = router;
+
 

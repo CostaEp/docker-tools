@@ -28,8 +28,8 @@ async function checkAndHealContainers() {
       const state = info.State; // 'running', 'exited', 'restarting', 'paused'
       const status = info.Status || '';
 
-      // Skip self (mobydock microservice containers) to prevent recursive restarts during normal operational tasks
-      if (name.includes('mobydock') || name.includes('docker-tools')) continue;
+      // Only skip mobydock-gateway (the main entrypoint API Gateway) to prevent Gateway restarts
+      if (name === 'mobydock-gateway') continue;
 
       // ── Rule 1: Auto-Restart Unhealthy or Crashed Containers ─────────
       const isUnhealthy = status.includes('(unhealthy)');

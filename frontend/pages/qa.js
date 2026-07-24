@@ -488,8 +488,9 @@ export async function renderQA(container) {
   window.qaSaveWatchdogRules    = qaSaveWatchdogRules;
   window.qaLoadWatchdogStatus   = qaLoadWatchdogStatus;
 
-  // Load Watchdog status on page mount
+  // Load Watchdog status on page mount & poll every 5s
   qaLoadWatchdogStatus();
+  setInterval(qaLoadWatchdogStatus, 5000);
 
   // Close autocomplete on click outside
   document.addEventListener('click', (e) => {
@@ -1261,6 +1262,7 @@ async function qaKillProcess(pid) {
     await api.containers.killProcess(selectedContainerId, pid, 'SIGKILL');
     toast(`⚡ Terminated PID ${pid} inside container`, 'success');
     await qaRefreshProcesses();
+    await qaLoadWatchdogStatus();
   } catch (err) {
     toast(`Failed to kill process: ${err.message}`, 'error');
   }
