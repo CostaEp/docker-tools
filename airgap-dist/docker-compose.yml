@@ -1,0 +1,152 @@
+services:
+
+  # ── Gateway — Traefik v3 API Gateway ─────────────────────────────────
+  mobydock-gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    image: docker-tools-gateway:2.4.0
+    container_name: mobydock-gateway
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "9090:80"      # Main Application Entrypoint & Proxy Gateway
+      - "8080:8080"    # Traefik Visual API Gateway Dashboard
+    depends_on:
+      mobydock-core:
+        condition: service_healthy
+      mobydock-qa:
+        condition: service_healthy
+      mobydock-files:
+        condition: service_healthy
+      mobydock-terminal:
+        condition: service_healthy
+    restart: unless-stopped
+    labels:
+      com.mobydock.component: "gateway"
+      com.mobydock.version: "2.4.0"
+      com.mobydock.managed-by: "docker-compose"
+
+  # ── Core — Containers, Images, Networks, Volumes, Stats, Compose, K8s, UI ──
+  mobydock-core:
+    build:
+      context: .
+      dockerfile: ./services/core/Dockerfile
+    image: docker-tools-core:2.4.0
+    container_name: mobydock-core
+    expose:
+      - "3001"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - mobydock_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - SERVICE_MODE=core
+      - PORT=3001
+      - DB_PATH=/app/data/store.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/health"]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 15s
+    labels:
+      com.mobydock.component: "core"
+      com.mobydock.version: "2.4.0"
+      com.mobydock.managed-by: "docker-compose"
+
+  # ── QA — Quality scoring, telemetry, diagnostics ─────────────────────
+  mobydock-qa:
+    build:
+      context: .
+      dockerfile: ./services/qa/Dockerfile
+    image: docker-tools-qa:2.4.0
+    container_name: mobydock-qa
+    expose:
+      - "3002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - mobydock_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - SERVICE_MODE=qa
+      - PORT=3002
+      - DB_PATH=/app/data/store.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/health"]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 15s
+    labels:
+      com.mobydock.component: "qa"
+      com.mobydock.version: "2.4.0"
+      com.mobydock.managed-by: "docker-compose"
+
+  # ── Files — File explorer, chmod, chown, read, write ─────────────────
+  mobydock-files:
+    build:
+      context: .
+      dockerfile: ./services/files/Dockerfile
+    image: docker-tools-files:2.4.0
+    container_name: mobydock-files
+    expose:
+      - "3003"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - mobydock_data:/app/data
+    environment:
+      - NODE_ENV=production
+      - SERVICE_MODE=files
+      - PORT=3003
+      - DB_PATH=/app/data/store.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/api/health"]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 15s
+    labels:
+      com.mobydock.component: "files"
+      com.mobydock.version: "2.4.0"
+      com.mobydock.managed-by: "docker-compose"
+
+  # ── Terminal — WebSocket PTY, xterm.js stream demuxer ────────────────
+  mobydock-terminal:
+    build:
+      context: .
+      dockerfile: ./services/terminal/Dockerfile
+    image: docker-tools-terminal:2.4.0
+    container_name: mobydock-terminal
+    expose:
+      - "3004"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - NODE_ENV=production
+      - SERVICE_MODE=terminal
+      - PORT=3004
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/api/health"]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 15s
+    labels:
+      com.mobydock.component: "terminal"
+      com.mobydock.version: "2.4.0"
+      com.mobydock.managed-by: "docker-compose"
+
+volumes:
+  mobydock_data:
+    driver: local
+    labels:
+      com.mobydock.purpose: "persistent-store"

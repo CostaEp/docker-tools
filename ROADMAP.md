@@ -38,6 +38,12 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **Auto-Self-Healing & Anomaly Engine**: Background watcher monitoring memory spikes (>95%), healthchecks (`unhealthy`), and crash loops (`CrashLoopBackOff`), with automated recovery rules.
 - ✅ **Persistent Audit Stream**: Recovery logs saved in `/app/data/store.json` and streamed live to UI.
 
+### 📦 v2.5.0 — Air-Gap Stack Bundler & Offline Installer Package [COMPLETED]
+- ✅ **Pre-Built Offline Image Tarball**: Single 122MB pre-exported image archive (`images/mobydock-stack-images.tar`).
+- ✅ **1-Click RHEL 9 Installer (`install.sh`)**: Auto-detects Podman / Docker Engine and deploys stack.
+- ✅ **GateScanner AV Sanitized (0 Non-Linux Files)**: Purged all non-Linux binaries (`0 .bare / .exe / .dll`).
+- ✅ **Bundled Archives**: Deployable `mobydock-v2.4.5-airgap-rhel9.zip` (134MB) and `mobydock-v2.4.5-airgap-rhel9.tar.gz` (131MB).
+
 ---
 
 

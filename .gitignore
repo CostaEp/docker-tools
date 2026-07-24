@@ -1,5 +1,8 @@
 node_modules/
 dist/
+mobydock-*.zip
+mobydock-*.tar.gz
+dockerforge-*.tar.gz
 *.tar.gz
 .DS_Store
 .env

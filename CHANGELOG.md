@@ -5,6 +5,16 @@ All notable changes to the MobyDock project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-07-24 — Air-Gap RHEL 9 Bundle & Offline Installer Release
+
+### 📦 Air-Gap Stack Bundler & Offline Packages
+- **Pre-Built Offline Image Archive**: Exported all 5 microservice containers (`mobydock-gateway`, `mobydock-core`, `mobydock-qa`, `mobydock-files`, `mobydock-terminal`) into a single 122MB offline tarball (`images/mobydock-stack-images.tar`).
+- **1-Click RHEL 9 Installer (`install.sh`)**: Auto-detects **Podman** (native RHEL 9) or **Docker Engine**, loads image tarballs, and launches the microservices stack (`docker compose up -d` / `podman-compose up -d`).
+- **GateScanner / AV Sanitized Audit**: Purged all non-Linux binaries (`.exe`, `.dll`, `.dylib`, `.bare`, `win32*`, `darwin*`) producing a 100% clean sanitization audit (`0 non-Linux files`).
+- **Deployable Archives**: Self-contained `mobydock-v2.4.5-airgap-rhel9.zip` (134MB) and `mobydock-v2.4.5-airgap-rhel9.tar.gz` (131MB).
+
+---
+
 ## [2.4.0] - 2026-07-24 — Live Container Process Manager & Self-Healing Watchdog Engine Release
 
 ### 💻 Process Manager (`htop` / `top`)
