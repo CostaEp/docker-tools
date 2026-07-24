@@ -118,7 +118,7 @@ export async function renderWatchdog(container) {
       <!-- SYSTEM-WIDE MULTI-CONTAINER PROCESS MATRIX -->
       <div class="wd-card">
         <div class="wd-card-title">
-          <span><i class="ph ph-cpu"></i> System-Wide Stack Process Matrix (All Containers)</span>
+          <span><i class="ph ph-cpu"></i> System-Wide Stack Process Matrix</span>
           <div style="display:flex;gap:10px;align-items:center">
             <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer">
               <input type="checkbox" id="wd-proc-auto" checked onchange="window.wdToggleAutoRefresh(this.checked)"> Auto (3s)
@@ -127,8 +127,39 @@ export async function renderWatchdog(container) {
           </div>
         </div>
 
-        <div style="margin-bottom:14px">
-          <input type="text" class="form-control" id="wd-proc-search" placeholder="Search processes by Container Name, PID, User, or Command..." oninput="window.wdFilterProcesses(this.value)">
+        <!-- FILTER TOOLBAR: Compose Stack, Container, State, and Search -->
+        <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+          <!-- 1. Compose Stack Filter -->
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Compose Stack</label>
+            <select class="form-control" id="wd-compose-filter" style="min-width:180px;font-size:12px" onchange="window.wdOnFilterChange()">
+              <option value="all">📁 All Compose Stacks</option>
+            </select>
+          </div>
+
+          <!-- 2. Container Filter -->
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Container</label>
+            <select class="form-control" id="wd-container-filter" style="min-width:180px;font-size:12px" onchange="window.wdOnFilterChange()">
+              <option value="all">📦 All Containers</option>
+            </select>
+          </div>
+
+          <!-- 3. State Filter -->
+          <div style="display:flex;flex-direction:column;gap:4px">
+            <label style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Status</label>
+            <select class="form-control" id="wd-state-filter" style="min-width:150px;font-size:12px" onchange="window.wdOnFilterChange()">
+              <option value="all">⚡ All States</option>
+              <option value="running">🟢 Running Only</option>
+              <option value="exited">🔴 Stopped / Exited</option>
+            </select>
+          </div>
+
+          <!-- 4. Text Search Input -->
+          <div style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:200px">
+            <label style="font-size:10px;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.05em">Search</label>
+            <input type="text" class="form-control" id="wd-proc-search" placeholder="Filter PID, User, Command..." style="font-size:12px" oninput="window.wdOnFilterChange()">
+          </div>
         </div>
 
         <!-- Container Process Groups -->
@@ -170,6 +201,7 @@ export async function renderWatchdog(container) {
   window.wdSaveRules         = wdSaveRules;
   window.wdRefreshAll        = wdRefreshAll;
   window.wdFilterProcesses   = wdFilterProcesses;
+  window.wdOnFilterChange    = wdOnFilterChange;
   window.wdKillProcess       = wdKillProcess;
   window.wdRestartContainer  = wdRestartContainer;
   window.wdToggleAutoRefresh = wdToggleAutoRefresh;
@@ -244,6 +276,8 @@ async function fetchWatchdogStatus() {
   }
 }
 
+let lastProcessDataMap = {};
+
 async function fetchStackProcesses() {
   const containerListEl = document.getElementById('wd-containers-process-list');
   if (!containerListEl) return;
@@ -254,6 +288,9 @@ async function fetchStackProcesses() {
 
     const statContainers = document.getElementById('wd-stat-containers');
     if (statContainers) statContainers.textContent = allStackContainers.length;
+
+    // Dynamically populate dropdown filters for Compose Stacks and Containers
+    updateDropdownFilters(allStackContainers);
 
     // Fetch process list for each container in parallel
     const processDataMap = {};
@@ -270,6 +307,7 @@ async function fetchStackProcesses() {
       }
     }));
 
+    lastProcessDataMap = processDataMap;
     renderProcessMatrix(allStackContainers, processDataMap);
   } catch (err) {
     if (containerListEl) {
@@ -278,22 +316,81 @@ async function fetchStackProcesses() {
   }
 }
 
+function updateDropdownFilters(containers) {
+  const composeSel = document.getElementById('wd-compose-filter');
+  const containerSel = document.getElementById('wd-container-filter');
+
+  if (composeSel) {
+    const currentCompose = composeSel.value || 'all';
+    const composeProjects = new Set(['mobydock']);
+    containers.forEach(c => {
+      if (c.Labels) {
+        const proj = c.Labels['com.docker.compose.project'] || c.Labels['com.mobydock.managed-by'];
+        if (proj) composeProjects.add(proj);
+      }
+    });
+
+    const optionsHTML = ['<option value="all">📁 All Compose Stacks</option>']
+      .concat(Array.from(composeProjects).map(p => `<option value="${escapeHtml(p)}" ${currentCompose === p ? 'selected' : ''}>📁 Stack: ${escapeHtml(p)}</option>`));
+    composeSel.innerHTML = optionsHTML.join('');
+  }
+
+  if (containerSel) {
+    const currentContainer = containerSel.value || 'all';
+    const optionsHTML = ['<option value="all">📦 All Containers</option>']
+      .concat(containers.map(c => {
+        const name = (c.Names && c.Names[0]) ? c.Names[0].replace(/^\//, '') : c.Id.slice(0, 8);
+        return `<option value="${escapeHtml(c.Id)}" ${currentContainer === c.Id ? 'selected' : ''}>📦 ${escapeHtml(name)} (${c.State})</option>`;
+      }));
+    containerSel.innerHTML = optionsHTML.join('');
+  }
+}
+
+function wdOnFilterChange() {
+  renderProcessMatrix(allStackContainers, lastProcessDataMap);
+}
+
 function renderProcessMatrix(containers, processMap) {
   const containerListEl = document.getElementById('wd-containers-process-list');
   if (!containerListEl) return;
 
-  const query = (processFilterQuery || '').toLowerCase();
+  const composeVal = (document.getElementById('wd-compose-filter')?.value || 'all').toLowerCase();
+  const containerVal = document.getElementById('wd-container-filter')?.value || 'all';
+  const stateVal = (document.getElementById('wd-state-filter')?.value || 'all').toLowerCase();
+  const searchVal = (document.getElementById('wd-proc-search')?.value || '').toLowerCase();
 
   const filteredContainers = containers.filter(c => {
     const name = (c.Names && c.Names[0]) ? c.Names[0].replace(/^\//, '') : c.Id.slice(0, 8);
-    if (!query) return true;
-    if (name.toLowerCase().includes(query) || c.State.toLowerCase().includes(query)) return true;
-    const procs = processMap[c.Id] || [];
-    return procs.some(p => p.pid.toString().includes(query) || p.command.toLowerCase().includes(query) || p.user.toLowerCase().includes(query));
+    const composeProj = (c.Labels ? (c.Labels['com.docker.compose.project'] || c.Labels['com.mobydock.managed-by'] || '') : '').toLowerCase();
+
+    // 1. Compose Stack Filter
+    if (composeVal !== 'all') {
+      if (composeVal === 'mobydock' && !name.includes('mobydock') && !composeProj.includes('mobydock')) return false;
+      if (composeVal !== 'mobydock' && !composeProj.includes(composeVal)) return false;
+    }
+
+    // 2. Container Filter
+    if (containerVal !== 'all' && c.Id !== containerVal) return false;
+
+    // 3. State Filter
+    if (stateVal !== 'all') {
+      if (stateVal === 'running' && c.State !== 'running') return false;
+      if (stateVal === 'exited' && c.State === 'running') return false;
+    }
+
+    // 4. Text Search
+    if (searchVal) {
+      const matchName = name.toLowerCase().includes(searchVal) || c.State.toLowerCase().includes(searchVal);
+      const procs = processMap[c.Id] || [];
+      const matchProc = procs.some(p => p.pid.toString().includes(searchVal) || p.command.toLowerCase().includes(searchVal) || p.user.toLowerCase().includes(searchVal));
+      if (!matchName && !matchProc) return false;
+    }
+
+    return true;
   });
 
   if (!filteredContainers.length) {
-    containerListEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">No containers match search filter "${escapeHtml(processFilterQuery)}".</div>`;
+    containerListEl.innerHTML = `<div style="text-align:center;padding:24px;color:var(--text-muted)">No containers match selected filter criteria.</div>`;
     return;
   }
 
