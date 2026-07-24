@@ -15,6 +15,7 @@ import { renderSecurity } from '/pages/security.js';
 import { renderCompose } from '/pages/compose.js';
 import { renderK8s } from '/pages/k8s.js';
 import { renderQA } from '/pages/qa.js';
+import { renderWatchdog } from '/pages/watchdog.js';
 import api from '/api.js';
 import toast from '/toast.js';
 
@@ -97,6 +98,7 @@ const PAGE_TITLES = {
   compose:  'Compose Builder',
   k8s:      'Kubernetes',
   qa:       'QA & Debugging',
+  watchdog: 'Watchdog & Stack Processes',
 };
 
 function getCurrentPage() {
@@ -148,6 +150,7 @@ async function loadPage(page, subId = null) {
     case 'compose':    await renderCompose(content); break;
     case 'k8s':        await renderK8s(content); break;
     case 'qa':         await renderQA(content); break;
+    case 'watchdog':   await renderWatchdog(content); break;
     case 'terminal':
       // Terminal page needs full height, no padding
       content.style.padding = '0';

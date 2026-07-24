@@ -357,104 +357,31 @@ export async function renderQA(container) {
             <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
             <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
           </div>
+        <!-- File Editor (Expanded to min-height 480px) -->
+        <div id="qa-editor-wrap" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span id="qa-editing-file" style="font-family:var(--font-mono);font-size:12px;font-weight:700;color:var(--text-primary)">Editing file</span>
+            <button class="btn btn-success btn-sm" onclick="window.qaSaveFile()"><i class="ph ph-floppy-disk"></i> Save to Container</button>
+          </div>
           <textarea class="form-control" id="qa-file-editor" style="min-height:480px;font-family:var(--font-mono);font-size:12px;line-height:1.5;background:#050811" placeholder="File contents..."></textarea>
         </div>
 
       </div>
 
-      <!-- CARD 6: Live Container Process Manager (htop / top view) -->
-      <div class="qa-card" id="qa-process-card">
-        <div class="qa-card-title" style="justify-space-between;display:flex;align-items:center;width:100%">
-          <span><i class="ph ph-cpu"></i> Live Container Process Manager (htop / top)</span>
-          <div style="display:flex;gap:10px;align-items:center">
-            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer">
-              <input type="checkbox" id="qa-proc-autorefresh" checked onchange="window.qaToggleProcAutoRefresh(this.checked)"> Auto (3s)
-            </label>
-            <button class="btn btn-secondary btn-sm" onclick="window.qaRefreshProcesses()"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:8px;margin-bottom:12px">
-          <input type="text" class="form-control" id="qa-proc-search" placeholder="Filter processes by PID, User, or Command..." oninput="window.qaFilterProcesses(this.value)" style="flex:1">
-        </div>
-
-        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:#030712;max-height:360px">
-          <table class="data-table" style="width:100%;font-size:12px;font-family:var(--font-mono)">
-            <thead>
-              <tr style="background:rgba(255,255,255,0.03);color:var(--text-muted)">
-                <th>PID</th>
-                <th>USER</th>
-                <th>CPU %</th>
-                <th>MEM %</th>
-                <th>STAT</th>
-                <th>TIME</th>
-                <th>COMMAND</th>
-                <th style="text-align:right">ACTION</th>
-              </tr>
-            </thead>
-            <tbody id="qa-proc-tbody">
-              <tr><td colspan="8" style="text-align:center;padding:16px;color:var(--text-muted)">Select a container to inspect running processes.</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- CARD 7: Self-Healing Watchdog Engine Control Panel -->
-      <div class="qa-card" id="qa-watchdog-card">
-        <div class="qa-card-title" style="justify-content:space-between">
-          <span><i class="ph ph-heartbeat"></i> Self-Healing Watchdog Engine (Auto-Recovery)</span>
-          <span id="qa-watchdog-badge" class="badge badge-success">🟢 Active (Polling 10s)</span>
-        </div>
-
-        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:16px">
-          <!-- Control Box -->
-          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px">
-            <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">Engine Status & Control</div>
-            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.4">Background watchdog automatically detects unhealthy healthchecks, container crashes, and RAM spikes.</p>
-            <button class="btn btn-primary btn-sm" id="qa-watchdog-toggle-btn" onclick="window.qaToggleWatchdog()" style="width:100%">
-              <i class="ph ph-power"></i> Toggle Watchdog Engine
-            </button>
-          </div>
-
-          <!-- Rule Settings -->
-          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px">
-            <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">Active Self-Healing Rules</div>
-            <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--text-secondary)">
-              <label style="display:flex;align-items:center;gap:6px">
-                <input type="checkbox" id="rule-unhealthy" checked onchange="window.qaSaveWatchdogRules()"> Auto-Restart Unhealthy Healthchecks
-              </label>
-              <label style="display:flex;align-items:center;gap:6px">
-                <input type="checkbox" id="rule-exited" checked onchange="window.qaSaveWatchdogRules()"> Auto-Restart Crashed Exit Codes (Non-Zero)
-              </label>
-              <label style="display:flex;align-items:center;gap:6px">
-                <input type="checkbox" id="rule-ram" checked onchange="window.qaSaveWatchdogRules()"> RAM Spike Protection (>95% Memory Threshold)
-              </label>
-              <label style="display:flex;align-items:center;gap:6px">
-                <input type="checkbox" id="rule-crashloop" checked onchange="window.qaSaveWatchdogRules()"> CrashLoopBackOff Guard (>5 restarts / 2 mins)
-              </label>
+      <!-- Dedicated Watchdog & Process Manager Banner -->
+      <div class="qa-card" style="background:linear-gradient(135deg, rgba(37,99,235,0.08), rgba(16,185,129,0.05));border:1px solid var(--border-bright)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:4px">
+              <i class="ph ph-shield-checkered" style="color:var(--accent-start)"></i> Dedicated Watchdog & Stack Process Manager
+            </div>
+            <div style="font-size:11px;color:var(--text-secondary)">
+              Inspect all multi-container processes across the stack with live pulse auto-healing indicators, kill actions, and audit feeds.
             </div>
           </div>
-        </div>
-
-        <!-- Audit Log Stream -->
-        <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
-          📜 Real-Time Watchdog Audit & Recovery Stream
-        </div>
-        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:#030712;max-height:220px">
-          <table class="data-table" style="width:100%;font-size:11px;font-family:var(--font-mono)">
-            <thead>
-              <tr style="background:rgba(255,255,255,0.03);color:var(--text-muted)">
-                <th>TIMESTAMP</th>
-                <th>CONTAINER</th>
-                <th>ACTION</th>
-                <th>SEVERITY</th>
-                <th>DETAILS</th>
-              </tr>
-            </thead>
-            <tbody id="qa-watchdog-tbody">
-              <tr><td colspan="5" style="text-align:center;padding:12px;color:var(--text-muted)">No watchdog recovery events recorded yet.</td></tr>
-            </tbody>
-          </table>
+          <button class="btn btn-primary btn-sm" onclick="window.navigateTo('watchdog')">
+            <i class="ph ph-arrow-right"></i> Open Watchdog Workbench
+          </button>
         </div>
       </div>
 
