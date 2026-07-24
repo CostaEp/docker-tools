@@ -1,6 +1,6 @@
-# Feature Matrix & System Architecture — MobyDock v2.2.0
+# Feature Matrix & System Architecture — MobyDock v2.3.0
 
-MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a **True 5-Container Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
+MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a **5-Container Microservices Architecture** with a **Traefik v3 API Gateway** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
 
 ---
 
@@ -8,6 +8,9 @@ MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a
 
 | Feature Area | Sub-Feature | Description | Status |
 |--------------|-------------|-------------|--------|
+| **API Gateway** | Traefik v3 Gateway | Modern API Gateway on port `9090` replacing legacy Nginx with dynamic path routing | ✅ Completed |
+| | Visual Dashboard | Interactive Traefik dashboard on port `8080` (`http://localhost:8080/dashboard/`) | ✅ Completed |
+| | Dynamic Routing | `traefik_dynamic.yml` file provider — 100% offline air-gap compliant | ✅ Completed |
 | **Dashboard** | Stat Cards | Total/Running/Stopped containers, Images, Volumes, Networks (all clickable) | ✅ Completed |
 | | Live Mini-Bars | Live CPU & Memory usage indicators per container | ✅ Completed |
 | | System Metadata | Host Docker Engine version, Kernel, OS, CPU count, RAM capacity | ✅ Completed |
@@ -42,8 +45,8 @@ MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a
 | **Spec Exporter** | Multi-Format Export | Reverse-engineer container inspect to Docker Compose YAML, Dockerfile, K8s Pod YAML, and Helm Charts | ✅ Completed |
 | **Compose Builder** | Visual Node Graph | Drag-and-drop interactive microservices canvas, bezier connections, live docker-compose.yml sync, instant stack deployment | ✅ Completed |
 | | Presets & Load | Quick templates (Postgres, Oracle Server, Oracle Client), local image dropdown, offline `.tar.gz` image load stream | ✅ Completed |
-| **Microservices** | 5-Container Architecture | `mobydock-gateway`, `mobydock-core`, `mobydock-qa`, `mobydock-files`, `mobydock-terminal` | ✅ Completed |
-| | Dynamic Nginx Resolver | Docker DNS resolver (`127.0.0.11`) for zero-downtime routing during backend microservice restarts | ✅ Completed |
+| **Microservices** | 5-Container Architecture | `mobydock-gateway` (Traefik v3), `mobydock-core`, `mobydock-qa`, `mobydock-files`, `mobydock-terminal` | ✅ Completed |
+| | Dynamic Routing | Traefik file provider with zero-downtime routing during backend microservice restarts | ✅ Completed |
 | | Fault Isolation | Decoupled containers — failure in one module (e.g. QA) does not affect others | ✅ Completed |
 | | Persistent Store | JSON/SQLite persistent data store (`/app/data/store.json`) for QA history, templates, audit logs | ✅ Completed |
 | | K8s-Ready Labels | Docker Compose labels map directly to K8s `Deployment`/`Service`/`ConfigMap` selectors | ✅ Completed |
@@ -54,14 +57,14 @@ MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a
 ## 🏛️ System Architecture
 
 ```
-                       Browser (Client)
-                               │
-                      HTTP / WS  Port 9090
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 mobydock-gateway (Nginx)                    │
-│            (Docker DNS Resolver: 127.0.0.11)                │
-└──────┬───────────────┬──────────────────┬─────────────────┬─┘
+                             Browser (Client)
+                                    │
+                       HTTP / WS  Port 9090
+                                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 mobydock-gateway (Traefik v3)                   │
+│        Web Entrypoint: Port 9090 | Dashboard: Port 8080        │
+└──────┬───────────────┬──────────────────┬─────────────────┬─────┘
        │               │                  │                 │
        │ /*, /api/*    │ /api/qa/*        │ /api/files/*    │ /socket.io/*
        ▼               ▼                  ▼                 ▼

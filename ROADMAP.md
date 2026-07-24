@@ -33,6 +33,11 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **Container QA Workbench**: Quality score (0-100, Grade A-F), live SVG telemetry sparklines (RAM, CPU, Storage), and 1-click live fixes.
 - ✅ **Live Container File Explorer & Permissions (`chmod`/`chown`)**: Stream demuxer, UTF-8 font support, live path autocomplete, colorized permission badges.
 
+### 🚦 v2.3.0 — Traefik v3 API Gateway & Visual Dashboard [COMPLETED]
+- ✅ **Traefik v3 API Gateway**: Upgraded `mobydock-gateway` from legacy Nginx to **Traefik v3 API Gateway** on port `9090`.
+- ✅ **Traefik Visual Dashboard (Port 8080)**: Live monitoring UI at `http://localhost:8080/dashboard/` tracking active routers, services, entrypoints, and middleware health.
+- ✅ **Air-Gap Dynamic File Provider (`traefik_dynamic.yml`)**: Dynamic YAML file routing rules supporting 100% offline air-gapped installations on RHEL 9 / Podman / Docker Desktop.
+
 ---
 
 

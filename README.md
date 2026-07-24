@@ -1,29 +1,29 @@
-# 🐳 MobyDock v2.2.0
+# 🐳 MobyDock v2.3.0
 
-> **Enterprise Docker & Podman Management — True 5-Container Microservices Architecture, Nginx Gateway, Container QA Workbench, Resource Telemetry, Live Permissions Manager, Compose Builder, and Spec Exporters**
+> **Enterprise Docker & Podman Management — 5-Container Microservices Architecture, Traefik v3 API Gateway, Visual Gateway Dashboard, Container QA Workbench, Resource Telemetry, Live Permissions Manager, Compose Builder, and Spec Exporters**
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-RHEL%209%20%7C%20Linux%20%7C%20macOS-orange.svg)
 ![Air--Gap](https://img.shields.io/badge/Air--Gapped-100%25%20Offline-success.svg)
-![Architecture](https://img.shields.io/badge/architecture-Microservices%20(5%20Containers)-purple.svg)
+![Gateway](https://img.shields.io/badge/gateway-Traefik%20v3%20API%20Gateway-purple.svg)
 
-**MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **True 5-Container Microservices Architecture** orchestrated via `docker-compose.yml` with an Nginx reverse proxy gateway — each sub-system runs in an isolated container with independent healthchecks and restart policies. If one worker fails or restarts, the rest of the system continues operating normally without interruption.
+**MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **5-Container Microservices Architecture** orchestrated via `docker-compose.yml` with a **Traefik v3 API Gateway** — each sub-system runs in an isolated container with independent healthchecks, dynamic file routing, and auto-restart policies.
 
 ---
 
-## ✨ Key Features (v2.2.0)
+## ✨ Key Features (v2.3.0)
 
-### 🏗️ True 5-Container Microservices Architecture
-- **Nginx Reverse Proxy Gateway (`mobydock-gateway`)**: Single public entry point on port `9090`. Uses Docker internal DNS (`127.0.0.11`) for dynamic upstream resolution and zero-downtime routing.
-- **Decoupled Backend Containers**:
+### 🚦 Traefik v3 API Gateway & Visual Dashboard
+- **Modern API Gateway (`mobydock-gateway`)**: Replaced legacy Nginx with **Traefik v3 API Gateway**. Entrypoint on port `9090`.
+- **Traefik Visual Dashboard (Port `8080`)**: Interactive web dashboard at `http://localhost:8080/dashboard/` for real-time traffic inspection, active routers, services, and middleware metrics.
+- **Air-Gap Ready Dynamic File Provider (`traefik_dynamic.yml`)**: Ultra-fast routing table supporting 100% offline air-gapped installations on RHEL 9 / Podman / Docker Desktop.
+- **Decoupled Backend Microservices**:
   - `mobydock-core` (Port 3001 internal): Container lifecycle, Images, Networks, Volumes, Stats, Compose, K8s, UI static assets.
   - `mobydock-qa` (Port 3002 internal): Container Quality Scorecard & real-time telemetry engine.
   - `mobydock-files` (Port 3003 internal): Container file explorer, UTF-8 base64 editor, live path autocomplete, `chmod`/`chown` controls.
   - `mobydock-terminal` (Port 3004 internal): WebSocket TTY handler & binary stream demuxer.
-- **Fault Isolation**: Stopping or restarting any worker service (e.g. `mobydock-qa`) leaves all other microservices fully operational.
-- **Persistent Storage** (`mobydock_data` volume → `/app/data/store.json`): QA history, Compose stack templates, audit logs, and settings survive container restarts.
-- **K8s-Ready Labels**: Docker Compose service labels (`com.mobydock.component`) map directly to Kubernetes `Deployment`, `Service`, and `ConfigMap` resources.
+- **Fault Isolation**: Stopping or restarting any worker service leaves all other microservices fully operational.
 
 ### 🛠️ Container QA & Debugging Workbench
 - **Quality Scorecard & Rating (0-100, Grade A-F)**: Automated security, memory, CPU, healthcheck, user, and restart policy evaluation.
@@ -46,24 +46,19 @@
 - Interactive microservices canvas with draggable service nodes and Bezier curve links.
 - Quick preset stacks (PostgreSQL, Oracle Server, Oracle Client) and offline `.tar.gz` image load.
 
-### 🛡️ 100% Air-Gapped Ready
-- Zero external CDN calls, vendor-bundled assets.
-- GateScanner AV compliant — stripped non-Linux binaries (`*.bare`, `win32*`, `darwin*`).
-- Deep purge of npm cache (`/root/.npm`, `/root/.cache`) in Docker build.
-
 ---
 
-## 🏛️ Microservices Architecture Diagram
+## 🏛️ Microservices & API Gateway Diagram
 
 ```
-                       Browser (Client)
-                               │
-                      HTTP / WS  Port 9090
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 mobydock-gateway (Nginx)                    │
-│            (Docker DNS Resolver: 127.0.0.11)                │
-└──────┬───────────────┬──────────────────┬─────────────────┬─┘
+                             Browser (Client)
+                                    │
+                       HTTP / WS  Port 9090
+                                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                 mobydock-gateway (Traefik v3)                   │
+│        Web Entrypoint: Port 9090 | Dashboard: Port 8080        │
+└──────┬───────────────┬──────────────────┬─────────────────┬─────┘
        │               │                  │                 │
        │ /*, /api/*    │ /api/qa/*        │ /api/files/*    │ /socket.io/*
        ▼               ▼                  ▼                 ▼
@@ -93,17 +88,18 @@
 
 ## 🚀 Quickstart
 
-### Option 1: Docker Compose (5 Microservice Containers)
+### Option 1: Docker Compose
 
 ```bash
 # Clone repository
 git clone https://github.com/CostaEp/docker-tools.git
 cd docker-tools
 
-# Build and start all 5 microservices
+# Build and start Traefik v3 Gateway & Microservices stack
 docker compose up -d --build
 ```
-Access the Web UI at **`http://localhost:9090`**.
+- Web Application UI: **`http://localhost:9090`**
+- Traefik API Gateway Dashboard: **`http://localhost:8080/dashboard/`**
 
 ---
 
@@ -111,22 +107,13 @@ Access the Web UI at **`http://localhost:9090`**.
 
 1. **Extract release bundle**:
    ```bash
-   tar -xzf mobydock-2.2.0.tar.gz
-   cd mobydock-release-v2.2.0
+   tar -xzf mobydock-2.3.0.tar.gz
+   cd mobydock-release-v2.3.0
    ```
 
 2. **Run Air-Gap Startup Script** (automatically detects Podman / Docker):
    ```bash
    ./start-airgap.sh
-   ```
-
-3. **Or run manually with Podman on RHEL 9**:
-   ```bash
-   # Enable Podman socket service
-   systemctl enable --now podman.socket
-
-   # Load image tarball & run compose
-   podman-compose up -d
    ```
 
 ---
@@ -139,7 +126,7 @@ docker-tools/
 │   ├── db/                   # Persistent SQLite/JSON data store module
 │   │   └── index.js          # QA history, compose templates, audit logs, settings
 │   ├── routes/
-│   │   ├── files.js          # 🆕 File Explorer Microservice (/api/files/*)
+│   │   ├── files.js          # File Explorer Microservice (/api/files/*)
 │   │   ├── qa.js             # QA Scoring + Telemetry Microservice (/api/qa/*)
 │   │   ├── containers.js     # Container lifecycle (/api/containers/*)
 │   │   ├── compose.js        # Compose Builder (/api/compose/*)
@@ -151,10 +138,10 @@ docker-tools/
 │   ├── pages/                # UI modules (qa, compose, dashboard, terminal, logs…)
 │   ├── api.js                # API client — /api/files/* + /api/qa/* routing
 │   └── vendor/               # 100% bundled offline assets (xterm.js, Chart.js…)
-├── nginx.conf                # Nginx Reverse Proxy Gateway config (port 9090)
+├── traefik_dynamic.yml       # 🆕 Traefik v3 dynamic file routing rules
 ├── scripts/
 │   └── package-release.sh    # Air-Gap release packager (GateScanner AV compliant)
-├── docker-compose.yml        # Orchestration for 5 microservice containers
+├── docker-compose.yml        # Orchestration for 5 microservice containers + Traefik
 ├── Dockerfile                # Multi-stage build with deep npm cache purge
 ├── CHANGELOG.md              # Semantic version history (SemVer)
 ├── ROADMAP.md                # Future version pipeline

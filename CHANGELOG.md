@@ -5,6 +5,13 @@ All notable changes to the MobyDock project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-07-24 — Traefik v3 API Gateway Release
+
+### 🚦 API Gateway & Architecture
+- **Traefik v3 API Gateway Upgrade**: Upgraded `mobydock-gateway` from legacy Nginx to **Traefik v3 API Gateway** on port `9090`.
+- **Traefik Visual Dashboard**: Enabled interactive Traefik gateway monitoring dashboard on port `8080` (`http://localhost:8080/dashboard/`) for inspecting live routers, services, entrypoints, and middleware health.
+- **Air-Gap Dynamic File Provider (`traefik_dynamic.yml`)**: Implemented dynamic YAML file routing rules (`PathPrefix`) for zero-downtime microservice routing, fully compatible with air-gapped RHEL 9 / Podman / Docker Desktop environments.
+
 ---
 
 ## [2.2.0] - 2026-07-24 — Microservices Architecture, Container QA Workbench & File Permissions Release
