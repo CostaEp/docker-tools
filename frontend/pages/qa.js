@@ -1,4 +1,4 @@
-/* ── DockerForge — QA & Debugging Workbench Page ─────────────────────────
+/* ── MobyDock — QA & Debugging Workbench Page ─────────────────────────
    Features:
    - Live Path & Directory Autocomplete (Instant Tab / Click autocomplete for folders & files inside container)
    - 100% Full-Width Single Stack Vertical Layout (No side-by-side cramped columns)

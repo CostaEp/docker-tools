@@ -1,13 +1,13 @@
-# 🐳 DockerForge v1.1.0 — מדריך הרצה בסביבת Air-Gap (RHEL 9 / Podman / Docker)
+# 🐳 MobyDock v1.1.0 — מדריך הרצה בסביבת Air-Gap (RHEL 9 / Podman / Docker)
 
-מדריך זה מפרט את הצעדים להרצת **DockerForge v1.1.0** בסביבה סגורה ללא חיבור לאינטרנט (Air-Gapped Environment) כגון Red Hat Enterprise Linux 9 (RHEL 9) או שרת מנותק רשת.
+מדריך זה מפרט את הצעדים להרצת **MobyDock v1.1.0** בסביבה סגורה ללא חיבור לאינטרנט (Air-Gapped Environment) כגון Red Hat Enterprise Linux 9 (RHEL 9) או שרת מנותק רשת.
 
 ---
 
-## 📦 תוכן חבילת ה-Air-Gap (`dockerforge-release-v1.1.0.tar.gz`)
+## 📦 תוכן חבילת ה-Air-Gap (`mobydock-release-v1.1.0.tar.gz`)
 
 בתוך ארכיב ה-`tar.gz` שתחלץ נמצאים הקבצים הבאים:
-* `dockerforge-1.1.0-image.tar` — אימג' Docker/Podman מיוצא ומוכן מראש (~95MB).
+* `mobydock-1.1.0-image.tar` — אימג' Docker/Podman מיוצא ומוכן מראש (~95MB).
 * `start-airgap.sh` — סקריפט הפעלה אוטומטי המזהה מנוע (Docker/Podman), טוען את האימג' ומריץ את המערכת.
 * `docker-compose.yml` — קובץ Docker Compose מוכן לפריסה.
 * `AIRGAP_GUIDE.md` — מדריך ההרצה הנוכחי.
@@ -19,15 +19,15 @@
 
 1. **חילוף הארכיב בשרת היעד:**
    ```bash
-   tar -xzf dockerforge-1.1.0.tar.gz
-   cd dockerforge-release-v1.1.0
+   tar -xzf mobydock-1.1.0.tar.gz
+   cd mobydock-release-v1.1.0
    ```
 
 2. **הרצת סקריפט ההפעלה האוטומטי:**
    ```bash
    ./start-airgap.sh
    ```
-   *(הסקריפט יטען אוטומטית את `dockerforge-1.1.0-image.tar` ל-Docker או ל-Podman ויעלה את הקונטיינר).*
+   *(הסקריפט יטען אוטומטית את `mobydock-1.1.0-image.tar` ל-Docker או ל-Podman ויעלה את הקונטיינר).*
 
 3. **גישה למערכת:**
    פתח דפדפן בכתובת: **`http://localhost:9090`** (או `http://<IP-OF-RHEL-SERVER>:9090`).
@@ -38,17 +38,17 @@
 
 1. **טעינת האימג' המוכנה מראש:**
    ```bash
-   docker load -i dockerforge-1.1.0-image.tar
+   docker load -i mobydock-1.1.0-image.tar
    ```
 
 2. **הרצת הקונטיינר:**
    ```bash
    docker run -d \
-     --name dockerforge \
+     --name mobydock \
      -p 9090:3000 \
      -v /var/run/docker.sock:/var/run/docker.sock \
      --restart unless-stopped \
-     docker-tools-dockerforge:latest
+     docker-tools-mobydock:latest
    ```
 
 ---
@@ -62,17 +62,17 @@
 
 2. **טעינת האימג' ב-Podman:**
    ```bash
-   podman load -i dockerforge-1.1.0-image.tar
+   podman load -i mobydock-1.1.0-image.tar
    ```
 
 3. **הרצת הקונטיינר ב-Podman:**
    ```bash
    podman run -d \
-     --name dockerforge \
+     --name mobydock \
      -p 9090:3000 \
      -v /run/podman/podman.sock:/var/run/docker.sock \
      --restart unless-stopped \
-     docker-tools-dockerforge:latest
+     docker-tools-mobydock:latest
    ```
 
 ---

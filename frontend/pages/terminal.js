@@ -21,7 +21,7 @@ function setupGlobalSocketListeners() {
   socket.on('terminal:ready', ({ sessionId }) => {
     const tab = tabs.get(sessionId);
     if (tab && tab.term) {
-      tab.term.writeln(`\x1b[36m[DockerForge]\x1b[0m Connected to \x1b[32m${tab.name}\x1b[0m\r\n`);
+      tab.term.writeln(`\x1b[36m[MobyDock]\x1b[0m Connected to \x1b[32m${tab.name}\x1b[0m\r\n`);
     }
   });
 
@@ -39,7 +39,7 @@ function setupGlobalSocketListeners() {
   socket.on('terminal:exit', ({ sessionId }) => {
     const tab = tabs.get(sessionId);
     if (tab && tab.term) {
-      tab.term.writeln('\r\n\x1b[33m[DockerForge]\x1b[0m Session ended.\r\n');
+      tab.term.writeln('\r\n\x1b[33m[MobyDock]\x1b[0m Session ended.\r\n');
     }
   });
 
@@ -229,7 +229,7 @@ function newTab(containerId, name) {
   if (socket) {
     setupGlobalSocketListeners();
 
-    term.writeln(`\x1b[36m[DockerForge]\x1b[0m Connecting to \x1b[33m${name}\x1b[0m...\r\n`);
+    term.writeln(`\x1b[36m[MobyDock]\x1b[0m Connecting to \x1b[33m${name}\x1b[0m...\r\n`);
     socket.emit('terminal:create', { sessionId, containerId, cols: term.cols, rows: term.rows });
 
     term.onData((data) => {

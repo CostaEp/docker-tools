@@ -1,6 +1,6 @@
-# Software Bill of Materials (SBOM) & Security Audit — DockerForge v1.0.0
+# Software Bill of Materials (SBOM) & Security Audit — MobyDock v1.0.0
 
-This document provides the Software Bill of Materials (SBOM) and security vulnerability audit for DockerForge v1.0.0.
+This document provides the Software Bill of Materials (SBOM) and security vulnerability audit for MobyDock v1.0.0.
 
 ---
 

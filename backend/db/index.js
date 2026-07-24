@@ -1,4 +1,4 @@
-/* ── DockerForge — Embedded SQLite & File Persistence DB Engine ─────────────
+/* ── MobyDock — Embedded SQLite & File Persistence DB Engine ─────────────
    Stores persistent application data:
    - QA Quality Scorecard history & trends
    - Saved Compose Stack Graph templates

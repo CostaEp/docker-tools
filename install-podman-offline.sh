@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# DockerForge — Offline Podman Installer for RHEL 9 / CentOS Stream 9
+# MobyDock — Offline Podman Installer for RHEL 9 / CentOS Stream 9
 # ==============================================================================
 
 set -e
@@ -8,7 +8,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RPM_DIR="${SCRIPT_DIR}/podman-rpms"
 
-echo "📦 DockerForge — Offline Podman Installation for RHEL 9"
+echo "📦 MobyDock — Offline Podman Installation for RHEL 9"
 echo "========================================================"
 
 if command -v podman &> /dev/null; then

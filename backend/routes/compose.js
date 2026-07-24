@@ -38,7 +38,7 @@ router.post('/deploy', async (req, res) => {
           Cmd: svc.command ? svc.command.split(' ') : undefined,
           User: svc.user || undefined,
           WorkingDir: svc.working_dir || undefined,
-          Labels: { 'com.dockerforge.managed': 'true', 'com.docker.compose.service': svc.name },
+          Labels: { 'com.mobydock.managed': 'true', 'com.docker.compose.service': svc.name },
           HostConfig: {
             Binds: svc.volumes || [],
             PortBindings: buildPortBindings(svc.ports || []),
@@ -84,11 +84,11 @@ router.post('/deploy', async (req, res) => {
   }
 });
 
-// GET /api/compose/running — list containers managed by dockerforge compose
+// GET /api/compose/running — list containers managed by mobydock compose
 router.get('/running', async (req, res) => {
   try {
     const docker = require('../docker');
-    const containers = await docker.listContainers({ all: false, filters: JSON.stringify({ label: ['com.dockerforge.managed=true'] }) });
+    const containers = await docker.listContainers({ all: false, filters: JSON.stringify({ label: ['com.mobydock.managed=true'] }) });
     res.json(containers.map(c => ({
       name: c.Names?.[0]?.replace(/^\//, ''),
       image: c.Image,

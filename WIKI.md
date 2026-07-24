@@ -1,6 +1,6 @@
-# DockerForge v1.0.0 — Official Wiki & Comprehensive Guide
+# MobyDock v1.0.0 — Official Wiki & Comprehensive Guide
 
-Welcome to the **DockerForge v1.0.0** documentation. DockerForge is a self-hosted, full-featured Docker container management Web UI designed for air-gapped enterprise environments, standalone Linux servers (RedHat Enterprise Linux 9, AlmaLinux, Rocky Linux, Ubuntu), and developer workstations.
+Welcome to the **MobyDock v1.0.0** documentation. MobyDock is a self-hosted, full-featured Docker container management Web UI designed for air-gapped enterprise environments, standalone Linux servers (RedHat Enterprise Linux 9, AlmaLinux, Rocky Linux, Ubuntu), and developer workstations.
 
 ---
 
@@ -44,8 +44,8 @@ Welcome to the **DockerForge v1.0.0** documentation. DockerForge is a self-hoste
 
 1. Extract the release package:
    ```bash
-   tar -xzf dockerforge-release-v1.0.0.tar.gz
-   cd dockerforge-release-v1.0.0
+   tar -xzf mobydock-release-v1.0.0.tar.gz
+   cd mobydock-release-v1.0.0
    ```
 
 2. Run the automated container setup:
@@ -61,11 +61,11 @@ If your target RHEL 9 machine **does NOT have Docker or Podman installed** and i
 
 1. Extract the release package on the RHEL 9 machine:
    ```bash
-   tar -xzf dockerforge-release-v1.0.0.tar.gz
-   cd dockerforge-release-v1.0.0
+   tar -xzf mobydock-release-v1.0.0.tar.gz
+   cd mobydock-release-v1.0.0
    ```
 
-2. Launch DockerForge directly via the standalone native script:
+2. Launch MobyDock directly via the standalone native script:
    ```bash
    ./start-standalone.sh
    ```

@@ -1,7 +1,7 @@
 {
-  "name": "dockerforge-backend",
+  "name": "mobydock-backend",
   "version": "2.2.0",
-  "description": "DockerForge backend API server",
+  "description": "MobyDock backend API server",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

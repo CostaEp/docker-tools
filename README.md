@@ -1,4 +1,4 @@
-# 🐳 DockerForge v2.2.0
+# 🐳 MobyDock v2.2.0
 
 > **Enterprise Docker & Podman Management — Modular Microservices Architecture, Container QA Workbench, Resource Telemetry, Live Permissions Manager, Compose Builder, and Spec Exporters**
 
@@ -8,7 +8,7 @@
 ![Air--Gap](https://img.shields.io/badge/Air--Gapped-100%25%20Offline-success.svg)
 ![Architecture](https://img.shields.io/badge/architecture-Microservices-purple.svg)
 
-**DockerForge** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **Modular Microservices Architecture** where each sub-system runs as a decoupled, fault-isolated module — if one module fails, the rest of the system continues operating normally.
+**MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **Modular Microservices Architecture** where each sub-system runs as a decoupled, fault-isolated module — if one module fails, the rest of the system continues operating normally.
 
 ---
 
@@ -59,7 +59,7 @@
                              │ HTTP / WebSocket
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│  dockerforge (Node.js Express Gateway — Port 3000)                  │
+│  mobydock (Node.js Express Gateway — Port 3000)                  │
 │                                                                     │
 │  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
 │  │  /api/qa        │  │  /api/files      │  │  WebSocket PTY   │   │
@@ -107,8 +107,8 @@ Access the Web UI at **`http://localhost:9090`**.
 
 1. **Extract release bundle**:
    ```bash
-   tar -xzf dockerforge-2.2.0.tar.gz
-   cd dockerforge-release-v2.2.0
+   tar -xzf mobydock-2.2.0.tar.gz
+   cd mobydock-release-v2.2.0
    ```
 
 2. **Run Air-Gap Startup Script** (automatically detects Podman / Docker):
@@ -122,11 +122,11 @@ Access the Web UI at **`http://localhost:9090`**.
    systemctl enable --now podman.socket
 
    # Load image tarball & run
-   podman load -i dockerforge-2.2.0-image.tar
-   podman run -d --name dockerforge -p 9090:3000 \
+   podman load -i mobydock-2.2.0-image.tar
+   podman run -d --name mobydock -p 9090:3000 \
      -v /run/podman/podman.sock:/var/run/docker.sock \
-     -v dockerforge_data:/app/data \
-     docker-tools-dockerforge:2.2.0
+     -v mobydock_data:/app/data \
+     docker-tools-mobydock:2.2.0
    ```
 
 ---

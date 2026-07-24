@@ -1,4 +1,4 @@
-/* ── DockerForge — Main Entry Point ─────────────────────────────────
+/* ── MobyDock — Main Entry Point ─────────────────────────────────
    Router, socket setup, sidebar, badge updates
    ─────────────────────────────────────────────────────────────────── */
 

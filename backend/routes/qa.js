@@ -1,4 +1,4 @@
-/* ── DockerForge — QA & Debugging Workbench + Quality Scoring Engine ───────
+/* ── MobyDock — QA & Debugging Workbench + Quality Scoring Engine ───────
    Endpoints:
    GET  /api/qa/containers/:id/score   — Compute container Quality & Health score (0-100, Grade A-F) + live telemetry stats + fixes + full YAML
    POST /api/qa/compose/score          — Compute Compose Stack Quality score (0-100, Grade A-F) + fixes

@@ -1,4 +1,4 @@
-/* ── DockerForge — Kubernetes Direct Deployment Page ──────────────────────
+/* ── MobyDock — Kubernetes Direct Deployment Page ──────────────────────
    Provides: cluster connection (kubeconfig / token), namespace selector,
    deploy from Compose Builder or container list, pods & rollout status.
    ────────────────────────────────────────────────────────────────────────── */

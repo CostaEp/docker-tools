@@ -1,6 +1,6 @@
-# Changelog — DockerForge
+# Changelog — MobyDock
 
-All notable changes to the DockerForge project will be documented in this file.
+All notable changes to the MobyDock project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 🏗️ Architecture
 - **Modular Microservices Architecture**: Decoupled backend into fault-isolated modules — `/api/files/*` (File Explorer), `/api/qa/*` (QA Telemetry & Scoring), WebSocket PTY Terminal, and Core REST Gateway.
 - **Persistent SQLite/JSON Data Store** (`backend/db/index.js`): QA score history, Compose stack templates, audit logs, backup schedules, and settings survive container restarts via `/app/data/store.json`.
-- **K8s-Ready Docker Compose Labels**: Service labels (`com.dockerforge.component`, `com.dockerforge.version`) map directly to Kubernetes `Deployment`/`Service`/`ConfigMap` selector patterns for future K8s migration.
+- **K8s-Ready Docker Compose Labels**: Service labels (`com.mobydock.component`, `com.mobydock.version`) map directly to Kubernetes `Deployment`/`Service`/`ConfigMap` selector patterns for future K8s migration.
 - **Deep GateScanner AV Purge**: `Dockerfile` and `package-release.sh` fully strip npm cache (`/root/.npm`, `/root/.cache`), all `*.bare`, `*.exe`, `*.dll`, `win32*`, `darwin*` directories. Verified `0 .bare files` in release tarball.
 
 
@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatically construct complete, parameterized Helm Charts (`Chart.yaml`, `values.yaml`, `templates/deployment.yaml`, `templates/service.yaml`, `templates/_helpers.tpl`).
   - Interactive template file switcher, single-click copy to clipboard, and individual template file download.
 - **Air-Gap Packaging**:
-  - Updated offline release bundler `package-release.sh` generating `dockerforge-release-v1.1.0.tar.gz`.
+  - Updated offline release bundler `package-release.sh` generating `mobydock-release-v1.1.0.tar.gz`.
 
 ---
 

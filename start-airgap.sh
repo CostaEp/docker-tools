@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# DockerForge v1.1.0 — Air-Gapped RHEL 9 / Podman / Docker Startup Script
+# MobyDock v1.1.0 — Air-Gapped RHEL 9 / Podman / Docker Startup Script
 # ==============================================================================
 
 set -e
 
-echo "🐳 DockerForge v1.1.0 — Air-Gapped Enterprise Setup"
+echo "🐳 MobyDock v1.1.0 — Air-Gapped Enterprise Setup"
 echo "===================================================="
 
 # Detect container engine (docker or podman)
@@ -30,9 +30,9 @@ fi
 echo "✓ Detected container engine: $ENGINE"
 
 # Load offline tar image if present
-IMAGE_TAR=$(ls dockerforge-*-image.tar 2>/dev/null | head -n 1)
-if [ -z "$IMAGE_TAR" ] && [ -f "dockerforge-1.1.0-image.tar" ]; then
-    IMAGE_TAR="dockerforge-1.1.0-image.tar"
+IMAGE_TAR=$(ls mobydock-*-image.tar 2>/dev/null | head -n 1)
+if [ -z "$IMAGE_TAR" ] && [ -f "mobydock-1.1.0-image.tar" ]; then
+    IMAGE_TAR="mobydock-1.1.0-image.tar"
 fi
 
 if [ -n "$IMAGE_TAR" ] && [ -f "$IMAGE_TAR" ]; then
@@ -53,7 +53,7 @@ if [ ! -S "$SOCKET_PATH" ]; then
 fi
 
 # Start container service
-echo "🚀 Starting DockerForge on http://localhost:9090 ..."
+echo "🚀 Starting MobyDock on http://localhost:9090 ..."
 
 if command -v docker-compose &> /dev/null; then
     docker-compose up -d
@@ -64,15 +64,15 @@ elif command -v podman-compose &> /dev/null; then
 else
     # Fallback to direct engine run
     $ENGINE run -d \
-        --name dockerforge \
+        --name mobydock \
         -p 9090:3000 \
         -v "$SOCKET_PATH":/var/run/docker.sock \
         --restart unless-stopped \
-        docker-tools-dockerforge:latest
+        docker-tools-mobydock:latest
 fi
 
 echo ""
 echo "===================================================="
-echo "🎉 DockerForge is running!"
+echo "🎉 MobyDock is running!"
 echo "👉 Open your browser at: http://localhost:9090"
 echo "===================================================="

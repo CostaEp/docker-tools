@@ -1,4 +1,4 @@
-# Bug Tracking & Resolution Log — DockerForge
+# Bug Tracking & Resolution Log — MobyDock
 
 This document tracks identified edge cases, reported issues, and resolution history across all releases.
 
@@ -6,7 +6,7 @@ This document tracks identified edge cases, reported issues, and resolution hist
 
 ## Resolved Issues
 
-### [BUG-001] Terminal connection hang on `[DockerForge] Connecting to container...`
+### [BUG-001] Terminal connection hang on `[MobyDock] Connecting to container...`
 - **Severity**: High
 - **Description**: Opening a terminal for containers without `/bin/bash` (e.g. Alpine or distroless images) caused an indefinite connection hang.
 - **Root Cause**: Backend pre-flight shell detector executed sequential `docker.exec()` calls without consuming streams, causing promise deadlocks inside `dockerode`.

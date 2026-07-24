@@ -1,4 +1,4 @@
-/* ── DockerForge — Live Container File Explorer & Permissions Microservice ──
+/* ── MobyDock — Live Container File Explorer & Permissions Microservice ──
    Endpoints:
    GET  /api/files/containers/:id/list   — List directory contents inside container
    POST /api/files/containers/:id/read   — Read file content inside container (base64 encoded read)

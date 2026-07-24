@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# DockerForge v1.0.0 — Standalone Native Startup (No Docker/Podman Required)
+# MobyDock v1.0.0 — Standalone Native Startup (No Docker/Podman Required)
 # ==============================================================================
 
 set -e
@@ -8,7 +8,7 @@ set -e
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${PORT:-9090}"
 
-echo "🐳 DockerForge v1.0.0 — Native Standalone Launcher"
+echo "🐳 MobyDock v1.0.0 — Native Standalone Launcher"
 echo "=================================================="
 
 # Detect Node.js
@@ -39,7 +39,7 @@ fi
 
 export PORT="$PORT"
 
-echo "🚀 Launching DockerForge server on http://localhost:${PORT} ..."
+echo "🚀 Launching MobyDock server on http://localhost:${PORT} ..."
 echo "--------------------------------------------------"
 
 cd "${PROJECT_DIR}"

@@ -1,4 +1,4 @@
-/* ── DockerForge — Kubernetes Direct Deployment Route ─────────────────────
+/* ── MobyDock — Kubernetes Direct Deployment Route ─────────────────────
    POST /api/k8s/config        — save kubeconfig or token+url
    GET  /api/k8s/config        — get connection state
    GET  /api/k8s/namespaces    — list all namespaces
@@ -87,7 +87,7 @@ router.post('/config', (req, res) => {
 
       const cluster = { name: 'target', server, skipTLSVerify: !!skipTls };
       const user    = { name: 'sa-user', token };
-      const ctxName = 'dockerforge-context';
+      const ctxName = 'mobydock-context';
 
       kc.loadFromOptions({
         clusters: [cluster],
@@ -262,7 +262,7 @@ router.delete('/resources/:kind/:name', async (req, res) => {
  */
 function composeServiceToK8s(name, svc, namespace) {
   const safeName = name.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
-  const labels   = { app: safeName, 'managed-by': 'dockerforge' };
+  const labels   = { app: safeName, 'managed-by': 'mobydock' };
 
   // ── Environment → ConfigMap + Secret split ──────────────────────────────
   const envPlain  = {};  // goes to ConfigMap

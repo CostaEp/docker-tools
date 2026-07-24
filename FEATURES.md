@@ -1,6 +1,6 @@
-# Feature Matrix & System Architecture — DockerForge v2.2.0
+# Feature Matrix & System Architecture — MobyDock v2.2.0
 
-DockerForge is an enterprise-ready, self-hosted Docker management Web UI built on a **Modular Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
+MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a **Modular Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
 
 ---
 
@@ -60,7 +60,7 @@ DockerForge is an enterprise-ready, self-hosted Docker management Web UI built o
                                                    │ HTTP / WebSockets
                                                    ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ DockerForge Container (Node.js 20 — Microservices Gateway)                       │
+│ MobyDock Container (Node.js 20 — Microservices Gateway)                       │
 │                                                                                 │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  ┌──────────────┐  │
 │  │ /api/qa         │  │ /api/files      │  │ WebSocket    │  │ Static UI    │  │

@@ -7,14 +7,14 @@
     "timestamp": "2026-07-21T21:00:00Z",
     "tools": [
       {
-        "vendor": "DockerForge Security Team",
+        "vendor": "MobyDock Security Team",
         "name": "AuditScanner",
         "version": "1.0.0"
       }
     ],
     "component": {
-      "group": "com.dockerforge",
-      "name": "dockerforge",
+      "group": "com.mobydock",
+      "name": "mobydock",
       "version": "1.0.0",
       "type": "application"
     }

@@ -85,5 +85,5 @@ require('./routes/stats').setupSocketStats(io);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🐳 DockerForge Microservices Engine running at http://localhost:${PORT}\n`);
+  console.log(`\n🐳 MobyDock Microservices Engine running at http://localhost:${PORT}\n`);
 });
