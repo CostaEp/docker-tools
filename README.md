@@ -8,6 +8,8 @@
 ![Air--Gap](https://img.shields.io/badge/Air--Gapped-100%25%20Offline-success.svg)
 ![Gateway](https://img.shields.io/badge/gateway-Traefik%20v3%20API%20Gateway-purple.svg)
 
+![MobyDock Banner](assets/mobydock_banner.png)
+
 **MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **5-Container Microservices Architecture** orchestrated via `docker-compose.yml` with a **Traefik v3 API Gateway** — each sub-system runs in an isolated container with independent healthchecks, dynamic file routing, and auto-restart policies.
 
 ---
