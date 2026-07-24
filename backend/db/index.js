@@ -82,7 +82,7 @@ module.exports = {
     if (dbState.auditLogs.length > 100) dbState.auditLogs.pop();
     saveDb();
   },
-  getWatchdogSettings: () => dbState.watchdogSettings || defaultState.watchdogSettings,
+  getWatchdogSettings: () => ({ ...defaultState.watchdogSettings, ...(dbState.watchdogSettings || {}) }),
   updateWatchdogSettings: (newSettings) => {
     dbState.watchdogSettings = { ...dbState.watchdogSettings, ...newSettings };
     saveDb();
