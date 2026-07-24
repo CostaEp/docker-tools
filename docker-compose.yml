@@ -1,13 +1,20 @@
 services:
 
-  # ── Gateway — nginx reverse proxy (single public entry point) ─────────
+  # ── Gateway — Traefik v3 API Gateway (Single Entrypoint on Port 9090) ────
   mobydock-gateway:
-    image: nginx:alpine
+    image: traefik:v3.0
     container_name: mobydock-gateway
+    command:
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
+      - "--providers.file.filename=/etc/traefik/dynamic.yml"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
     ports:
-      - "9090:80"
+      - "9090:80"      # Main Application Entrypoint & Proxy Gateway
+      - "8080:8080"    # Traefik Visual API Gateway Dashboard
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./traefik_dynamic.yml:/etc/traefik/dynamic.yml:ro
     depends_on:
       mobydock-core:
         condition: service_healthy
