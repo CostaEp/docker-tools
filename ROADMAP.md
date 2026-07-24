@@ -33,10 +33,10 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **Container QA Workbench**: Quality score (0-100, Grade A-F), live SVG telemetry sparklines (RAM, CPU, Storage), and 1-click live fixes.
 - ✅ **Live Container File Explorer & Permissions (`chmod`/`chown`)**: Stream demuxer, UTF-8 font support, live path autocomplete, colorized permission badges.
 
-### 🚦 v2.3.0 — Traefik v3 API Gateway & Visual Dashboard [COMPLETED]
-- ✅ **Traefik v3 API Gateway**: Upgraded `mobydock-gateway` from legacy Nginx to **Traefik v3 API Gateway** on port `9090`.
-- ✅ **Traefik Visual Dashboard (Port 8080)**: Live monitoring UI at `http://localhost:8080/dashboard/` tracking active routers, services, entrypoints, and middleware health.
-- ✅ **Air-Gap Dynamic File Provider (`traefik_dynamic.yml`)**: Dynamic YAML file routing rules supporting 100% offline air-gapped installations on RHEL 9 / Podman / Docker Desktop.
+### ⚡ v2.4.0 — Live Container Process Manager & Self-Healing Watchdog Engine [COMPLETED]
+- ✅ **Interactive Process Manager (`htop` / `top`)**: Live process table per container with thread count, memory/CPU per PID, and 1-click `kill -9` (`SIGKILL` / `SIGTERM`).
+- ✅ **Auto-Self-Healing & Anomaly Engine**: Background watcher monitoring memory spikes (>95%), healthchecks (`unhealthy`), and crash loops (`CrashLoopBackOff`), with automated recovery rules.
+- ✅ **Persistent Audit Stream**: Recovery logs saved in `/app/data/store.json` and streamed live to UI.
 
 ---
 
@@ -45,18 +45,6 @@ This document outlines the official product roadmap and technical specifications
 - **Offline Trivy / Grype Vulnerability Scanner**: Integrate static image vulnerability scanning for local Docker/Podman images without requiring external internet.
 - **CVE Breakdown & Filtering**: Categorize CVEs by severity rating (`Critical`, `High`, `Medium`, `Low`) with package names, vulnerable versions, and fixed version recommendations.
 - **Container File Diff & Integrity Monitor**: Detect modified (`~`), created (`+`), and deleted (`-`) files inside running containers compared to original base images.
-
----
-
-### 📦 v2.4.0 — Air-Gap Stack Bundler & Volume Backup Engine (Target B)
-- **1-Click Air-Gap Stack Bundler**: Export complete multi-container stacks (all container images + docker-compose.yml + environment files + offline setup script) into a SINGLE self-extracting `.tar.gz` archive.
-- **Automated Volume Backup & Cron Snapshot Engine**: Scheduled cron backups for Docker volumes (PostgreSQL, Oracle, Redis, MySQL data), compressed `.tar.gz` encryption, and 1-click restore/migration.
-
----
-
-### ⚡ v2.5.0 — Interactive Process Manager & Self-Healing Watchdog (Target C)
-- **Interactive Container Process Manager (`htop` / `top`)**: Live process table per container with thread count, memory/CPU per PID, and 1-click `kill -9` / `strace`.
-- **Auto-Self-Healing & Anomaly Engine**: Background watcher monitoring memory spikes, CPU loops, high restart counts, and crash loops (`CrashLoopBackOff`), with automated recovery rules.
 
 ---
 

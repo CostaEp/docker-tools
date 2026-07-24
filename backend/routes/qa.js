@@ -11,9 +11,11 @@
    POST /api/qa/containers/:id/chown   — Change ownership (chown user:group)
    ────────────────────────────────────────────────────────────────────────── */
 
-const express = require('express');
-const router  = express.Router();
-const docker  = require('../docker');
+const express  = require('express');
+const router   = express.Router();
+const docker   = require('../docker');
+const watchdog = require('../lib/watchdog');
+const db       = require('../db');
 
 /* ── Bulletproof Docker Stream Demuxer (Fixes Stream Fragmentation & Garbled Text) ── */
 async function execInContainer(container, cmdArray) {
@@ -690,5 +692,44 @@ router.post('/containers/:id/write', async (req, res) => {
     res.status(500).json({ error: `Failed to save file: ${err.message}` });
   }
 });
+/* ── Self-Healing Watchdog API Endpoints ─────────────────────────────── */
+
+// GET /api/qa/watchdog/status — Get engine status, rules, and event logs
+router.get('/watchdog/status', (req, res) => {
+  try {
+    const status = watchdog.getStatus();
+    res.json(status);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/qa/watchdog/toggle — Enable / Disable Watchdog Engine
+router.post('/watchdog/toggle', (req, res) => {
+  try {
+    const current = db.getWatchdogSettings();
+    const updated = db.updateWatchdogSettings({ enabled: !current.enabled });
+    if (updated.enabled) {
+      watchdog.startWatchdog();
+    } else {
+      watchdog.stopWatchdog();
+    }
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/qa/watchdog/rules — Update Watchdog rule settings
+router.post('/watchdog/rules', (req, res) => {
+  try {
+    const newRules = req.body || {};
+    const updated = db.updateWatchdogSettings(newRules);
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 module.exports = router;
+

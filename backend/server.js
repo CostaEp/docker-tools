@@ -41,7 +41,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     service: SERVICE_MODE,
-    version: '2.3.0',
+    version: '2.4.0',
     timestamp: new Date().toISOString(),
   });
 });

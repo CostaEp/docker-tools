@@ -216,6 +216,66 @@ router.post('/:id/exec', async (req, res) => {
   stream.on('error', (e) => res.status(500).json({ error: e.message }));
 });
 
+// Get container running processes (htop / top view)
+router.get('/:id/processes', async (req, res) => {
+  try {
+    const container = docker.getContainer(req.params.id);
+    let topData = null;
+
+    try {
+      topData = await container.top({ ps_args: 'aux' });
+    } catch (e) {
+      topData = await container.top();
+    }
+
+    const titles = topData.Titles || ['PID', 'USER', 'TIME', 'COMMAND'];
+    const processes = (topData.Processes || []).map(row => {
+      const proc = {};
+      titles.forEach((title, idx) => {
+        proc[title.toLowerCase().replace(/%/g, 'perc_')] = row[idx] || '';
+      });
+
+      return {
+        pid: proc.pid || row[1] || row[0],
+        user: proc.user || row[0] || 'root',
+        cpuPerc: proc.perc_cpu || proc.cpu || '0.0',
+        memPerc: proc.perc_mem || proc.mem || '0.0',
+        vsz: proc.vsz || '0',
+        rss: proc.rss || '0',
+        stat: proc.stat || proc.state || 'S',
+        time: proc.time || '0:00',
+        command: proc.command || proc.cmd || row[row.length - 1] || 'unknown',
+        raw: row,
+      };
+    });
+
+    res.json({ titles, processes });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to fetch container processes' });
+  }
+});
+
+// Kill process inside container by PID (kill -9 <pid>)
+router.post('/:id/processes/kill', async (req, res) => {
+  try {
+    const container = docker.getContainer(req.params.id);
+    const { pid, signal } = req.body;
+    if (!pid) return res.status(400).json({ error: 'PID is required' });
+
+    const sig = signal || 'SIGKILL';
+    const exec = await container.exec({
+      Cmd: ['kill', sig === 'SIGKILL' ? '-9' : '-15', pid.toString()],
+      AttachStdout: true,
+      AttachStderr: true,
+    });
+    await exec.start({ hijack: true, stdin: false });
+
+    res.json({ success: true, pid, signal: sig, message: `Sent ${sig} to PID ${pid}` });
+  } catch (err) {
+    res.status(500).json({ error: err.message || 'Failed to kill process' });
+  }
+});
+
 // Prune stopped containers
 router.post('/prune', async (req, res) => {
   const result = await docker.pruneContainers();
@@ -223,3 +283,4 @@ router.post('/prune', async (req, res) => {
 });
 
 module.exports = router;
+

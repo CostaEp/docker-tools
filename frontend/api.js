@@ -44,6 +44,8 @@ export const api = {
     exec: (id, cmd) => request('POST', `/api/containers/${id}/exec`, { cmd }),
     prune: () => request('POST', '/api/containers/prune'),
     run: (opts) => request('POST', '/api/containers/run', opts),
+    processes: (id) => request('GET', `/api/containers/${id}/processes`),
+    killProcess: (id, pid, signal = 'SIGKILL') => request('POST', `/api/containers/${id}/processes/kill`, { pid, signal }),
   },
 
   // ── Images ──────────────────────────────────────────────────────
@@ -134,6 +136,9 @@ export const api = {
     writeFile:      (id, path, content) => request('POST', `/api/files/containers/${id}/write`, { path, content }),
     chmod:          (id, path, mode)    => request('POST', `/api/files/containers/${id}/chmod`, { path, mode }),
     chown:          (id, path, owner)   => request('POST', `/api/files/containers/${id}/chown`, { path, owner }),
+    watchdogStatus: ()                  => request('GET',    '/api/qa/watchdog/status'),
+    watchdogToggle: ()                  => request('POST',   '/api/qa/watchdog/toggle'),
+    watchdogRules:  (rules)             => request('POST',   '/api/qa/watchdog/rules', rules),
   },
 
   // ── File Explorer & Permissions Microservice (Dedicated /api/files) ─

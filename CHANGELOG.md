@@ -5,6 +5,22 @@ All notable changes to the MobyDock project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.4.0] - 2026-07-24 — Live Container Process Manager & Self-Healing Watchdog Engine Release
+
+### 💻 Process Manager (`htop` / `top`)
+- **Live Container Process Table**: Real-time process listing (`PID`, `USER`, `%CPU`, `%MEM`, `RSS`, `STAT`, `TIME`, `COMMAND`) inside target container (`GET /api/containers/:id/processes`).
+- **Live Process Filtering & Auto-Refresh**: Instant search input filtering with 3-second auto-polling loop.
+- **1-Click Process Termination**: Issue `kill -9` (`SIGKILL` / `SIGTERM`) directly to any PID inside container from Web UI (`POST /api/containers/:id/processes/kill`).
+
+### 🛡️ Self-Healing Watchdog Engine
+- **Background Anomaly Monitor (`backend/lib/watchdog.js`)**: 10-second inspection loop checking container health state, RAM usage spikes, and crash loops.
+- **Automated Health & Crash Recovery**: Auto-restarts containers failing healthchecks (`unhealthy`) or crashing with non-zero exit code (`exited`).
+- **RAM Spike Protection**: Detects containers exceeding 95% RAM threshold and logs automated protection alerts.
+- **CrashLoopBackOff Protection**: Prevents infinite crash loops by isolating containers restarting >5 times in 2 minutes.
+- **Persistent Event Stream**: Self-healing audit log stored in `/app/data/store.json` and streamed to the UI (`GET /api/qa/watchdog/status`).
+
+---
+
 ## [2.3.0] - 2026-07-24 — Traefik v3 API Gateway Release
 
 ### 🚦 API Gateway & Architecture

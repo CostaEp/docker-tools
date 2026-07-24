@@ -23,6 +23,16 @@ const defaultState = {
   composeTemplates: [],
   auditLogs: [],
   backupSchedules: [],
+  watchdogLogs: [],
+  watchdogSettings: {
+    enabled: true,
+    autoRestartUnhealthy: true,
+    autoRestartExited: true,
+    ramSpikeProtection: true,
+    ramThresholdPerc: 95,
+    crashLoopProtection: true,
+    pollIntervalMs: 10000,
+  },
   settings: {
     telemetryPollInterval: 3000,
     maxBackupRetention: 3,
@@ -72,9 +82,23 @@ module.exports = {
     if (dbState.auditLogs.length > 100) dbState.auditLogs.pop();
     saveDb();
   },
+  getWatchdogSettings: () => dbState.watchdogSettings || defaultState.watchdogSettings,
+  updateWatchdogSettings: (newSettings) => {
+    dbState.watchdogSettings = { ...dbState.watchdogSettings, ...newSettings };
+    saveDb();
+    return dbState.watchdogSettings;
+  },
+  getWatchdogLogs: () => dbState.watchdogLogs || [],
+  addWatchdogLog: (entry) => {
+    if (!dbState.watchdogLogs) dbState.watchdogLogs = [];
+    dbState.watchdogLogs.unshift({ ...entry, id: Date.now().toString(), timestamp: new Date().toISOString() });
+    if (dbState.watchdogLogs.length > 100) dbState.watchdogLogs.pop();
+    saveDb();
+  },
   getSettings: () => dbState.settings,
   updateSettings: (newSettings) => {
     dbState.settings = { ...dbState.settings, ...newSettings };
     saveDb();
   },
 };
+

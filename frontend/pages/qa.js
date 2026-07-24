@@ -362,6 +362,102 @@ export async function renderQA(container) {
 
       </div>
 
+      <!-- CARD 6: Live Container Process Manager (htop / top view) -->
+      <div class="qa-card" id="qa-process-card">
+        <div class="qa-card-title" style="justify-space-between;display:flex;align-items:center;width:100%">
+          <span><i class="ph ph-cpu"></i> Live Container Process Manager (htop / top)</span>
+          <div style="display:flex;gap:10px;align-items:center">
+            <label style="font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:4px;cursor:pointer">
+              <input type="checkbox" id="qa-proc-autorefresh" checked onchange="window.qaToggleProcAutoRefresh(this.checked)"> Auto (3s)
+            </label>
+            <button class="btn btn-secondary btn-sm" onclick="window.qaRefreshProcesses()"><i class="ph ph-arrow-clockwise"></i> Refresh</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <input type="text" class="form-control" id="qa-proc-search" placeholder="Filter processes by PID, User, or Command..." oninput="window.qaFilterProcesses(this.value)" style="flex:1">
+        </div>
+
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:#030712;max-height:360px">
+          <table class="data-table" style="width:100%;font-size:12px;font-family:var(--font-mono)">
+            <thead>
+              <tr style="background:rgba(255,255,255,0.03);color:var(--text-muted)">
+                <th>PID</th>
+                <th>USER</th>
+                <th>CPU %</th>
+                <th>MEM %</th>
+                <th>STAT</th>
+                <th>TIME</th>
+                <th>COMMAND</th>
+                <th style="text-align:right">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="qa-proc-tbody">
+              <tr><td colspan="8" style="text-align:center;padding:16px;color:var(--text-muted)">Select a container to inspect running processes.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- CARD 7: Self-Healing Watchdog Engine Control Panel -->
+      <div class="qa-card" id="qa-watchdog-card">
+        <div class="qa-card-title" style="justify-content:space-between">
+          <span><i class="ph ph-heartbeat"></i> Self-Healing Watchdog Engine (Auto-Recovery)</span>
+          <span id="qa-watchdog-badge" class="badge badge-success">🟢 Active (Polling 10s)</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px;margin-bottom:16px">
+          <!-- Control Box -->
+          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">Engine Status & Control</div>
+            <p style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.4">Background watchdog automatically detects unhealthy healthchecks, container crashes, and RAM spikes.</p>
+            <button class="btn btn-primary btn-sm" id="qa-watchdog-toggle-btn" onclick="window.qaToggleWatchdog()" style="width:100%">
+              <i class="ph ph-power"></i> Toggle Watchdog Engine
+            </button>
+          </div>
+
+          <!-- Rule Settings -->
+          <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px">
+            <div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:10px">Active Self-Healing Rules</div>
+            <div style="display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--text-secondary)">
+              <label style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="rule-unhealthy" checked onchange="window.qaSaveWatchdogRules()"> Auto-Restart Unhealthy Healthchecks
+              </label>
+              <label style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="rule-exited" checked onchange="window.qaSaveWatchdogRules()"> Auto-Restart Crashed Exit Codes (Non-Zero)
+              </label>
+              <label style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="rule-ram" checked onchange="window.qaSaveWatchdogRules()"> RAM Spike Protection (>95% Memory Threshold)
+              </label>
+              <label style="display:flex;align-items:center;gap:6px">
+                <input type="checkbox" id="rule-crashloop" checked onchange="window.qaSaveWatchdogRules()"> CrashLoopBackOff Guard (>5 restarts / 2 mins)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Log Stream -->
+        <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">
+          📜 Real-Time Watchdog Audit & Recovery Stream
+        </div>
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:#030712;max-height:220px">
+          <table class="data-table" style="width:100%;font-size:11px;font-family:var(--font-mono)">
+            <thead>
+              <tr style="background:rgba(255,255,255,0.03);color:var(--text-muted)">
+                <th>TIMESTAMP</th>
+                <th>CONTAINER</th>
+                <th>ACTION</th>
+                <th>SEVERITY</th>
+                <th>DETAILS</th>
+              </tr>
+            </thead>
+            <tbody id="qa-watchdog-tbody">
+              <tr><td colspan="5" style="text-align:center;padding:12px;color:var(--text-muted)">No watchdog recovery events recorded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   `;
 
@@ -384,6 +480,16 @@ export async function renderQA(container) {
   window.qaOnPathInput        = qaOnPathInput;
   window.qaOnPathKeydown      = qaOnPathKeydown;
   window.qaSelectAutocomplete = qaSelectAutocomplete;
+  window.qaRefreshProcesses     = qaRefreshProcesses;
+  window.qaFilterProcesses      = qaFilterProcesses;
+  window.qaKillProcess          = qaKillProcess;
+  window.qaToggleProcAutoRefresh= qaToggleProcAutoRefresh;
+  window.qaToggleWatchdog       = qaToggleWatchdog;
+  window.qaSaveWatchdogRules    = qaSaveWatchdogRules;
+  window.qaLoadWatchdogStatus   = qaLoadWatchdogStatus;
+
+  // Load Watchdog status on page mount
+  qaLoadWatchdogStatus();
 
   // Close autocomplete on click outside
   document.addEventListener('click', (e) => {
@@ -540,6 +646,8 @@ async function qaOnSelectContainer(id) {
 
   if (!id) return;
   await loadScore(id);
+  await qaRefreshProcesses();
+  qaToggleProcAutoRefresh(true);
 
   // Start 3-second auto-polling loop for live telemetry curves
   telemetryTimer = setInterval(async () => {
@@ -1089,6 +1197,160 @@ async function qaSaveFile() {
   }
 }
 
+/* ── Live Container Process Manager (htop) & Watchdog Handlers ──────────── */
+let currentProcesses = [];
+let procAutoTimer = null;
+
+async function qaRefreshProcesses() {
+  if (!selectedContainerId) return;
+  const tbody = document.getElementById('qa-proc-tbody');
+  if (!tbody) return;
+
+  try {
+    const data = await api.containers.processes(selectedContainerId);
+    currentProcesses = data.processes || [];
+    renderProcessesTable(currentProcesses);
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:16px;color:#ef4444">Failed to fetch processes: ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
+function renderProcessesTable(list) {
+  const tbody = document.getElementById('qa-proc-tbody');
+  if (!tbody) return;
+
+  if (!list || !list.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:16px;color:var(--text-muted)">No active processes found inside container.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(p => `
+    <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
+      <td style="font-weight:700;color:var(--accent-start)">${escapeHtml(p.pid)}</td>
+      <td style="color:var(--text-secondary)">${escapeHtml(p.user)}</td>
+      <td style="color:${parseFloat(p.cpuPerc) > 50 ? '#ef4444' : '#22c55e'}">${escapeHtml(p.cpuPerc)}%</td>
+      <td style="color:${parseFloat(p.memPerc) > 50 ? '#f59e0b' : '#3b82f6'}">${escapeHtml(p.memPerc)}%</td>
+      <td><span class="badge badge-sm badge-secondary">${escapeHtml(p.stat)}</span></td>
+      <td style="color:var(--text-muted)">${escapeHtml(p.time)}</td>
+      <td style="color:var(--text-primary);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(p.command)}">
+        ${escapeHtml(p.command)}
+      </td>
+      <td style="text-align:right">
+        <button class="btn btn-danger btn-xs" style="padding:2px 8px;font-size:10px" onclick="window.qaKillProcess('${p.pid}')" title="Send SIGKILL (-9) to process">
+          ⚡ Kill -9
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function qaFilterProcesses(query) {
+  const q = (query || '').toLowerCase();
+  const filtered = currentProcesses.filter(p => 
+    p.pid.toString().includes(q) ||
+    p.user.toLowerCase().includes(q) ||
+    p.command.toLowerCase().includes(q)
+  );
+  renderProcessesTable(filtered);
+}
+
+async function qaKillProcess(pid) {
+  if (!confirm(`Are you sure you want to terminate PID ${pid} inside container?`)) return;
+
+  try {
+    await api.containers.killProcess(selectedContainerId, pid, 'SIGKILL');
+    toast(`⚡ Terminated PID ${pid} inside container`, 'success');
+    await qaRefreshProcesses();
+  } catch (err) {
+    toast(`Failed to kill process: ${err.message}`, 'error');
+  }
+}
+
+function qaToggleProcAutoRefresh(enabled) {
+  if (procAutoTimer) {
+    clearInterval(procAutoTimer);
+    procAutoTimer = null;
+  }
+  if (enabled) {
+    procAutoTimer = setInterval(qaRefreshProcesses, 3000);
+  }
+}
+
+async function qaLoadWatchdogStatus() {
+  try {
+    const data = await api.qa.watchdogStatus();
+    const badge = document.getElementById('qa-watchdog-badge');
+    const toggleBtn = document.getElementById('qa-watchdog-toggle-btn');
+    const tbody = document.getElementById('qa-watchdog-tbody');
+
+    if (data.settings) {
+      if (badge) {
+        badge.className = data.settings.enabled ? 'badge badge-success' : 'badge badge-danger';
+        badge.textContent = data.settings.enabled ? '🟢 Active Watchdog (Polling 10s)' : '🔴 Watchdog Disabled';
+      }
+      if (toggleBtn) {
+        toggleBtn.className = data.settings.enabled ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm';
+        toggleBtn.innerHTML = data.settings.enabled ? '<i class="ph ph-power"></i> Disable Watchdog Engine' : '<i class="ph ph-power"></i> Enable Watchdog Engine';
+      }
+
+      // Checkboxes
+      const rUnhealthy = document.getElementById('rule-unhealthy');
+      const rExited = document.getElementById('rule-exited');
+      const rRam = document.getElementById('rule-ram');
+      const rCrash = document.getElementById('rule-crashloop');
+      if (rUnhealthy) rUnhealthy.checked = !!data.settings.autoRestartUnhealthy;
+      if (rExited) rExited.checked = !!data.settings.autoRestartExited;
+      if (rRam) rRam.checked = !!data.settings.ramSpikeProtection;
+      if (rCrash) rCrash.checked = !!data.settings.crashLoopProtection;
+    }
+
+    // Logs
+    if (tbody && data.recentLogs) {
+      if (!data.recentLogs.length) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:12px;color:var(--text-muted)">No watchdog recovery events recorded yet. Engine monitoring active.</td></tr>`;
+      } else {
+        tbody.innerHTML = data.recentLogs.slice(0, 15).map(l => `
+          <tr style="border-bottom:1px solid rgba(255,255,255,0.03)">
+            <td style="color:var(--text-muted);white-space:nowrap">${new Date(l.timestamp).toLocaleTimeString()}</td>
+            <td style="font-weight:700;color:var(--text-primary)">${escapeHtml(l.containerName)}</td>
+            <td style="color:var(--accent-start)">${escapeHtml(l.action)}</td>
+            <td><span class="badge badge-sm badge-${l.severity === 'CRITICAL' || l.severity === 'ERROR' ? 'danger' : l.severity === 'WARNING' ? 'warning' : 'success'}">${escapeHtml(l.severity)}</span></td>
+            <td style="color:var(--text-secondary);max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.message)}">${escapeHtml(l.message)}</td>
+          </tr>
+        `).join('');
+      }
+    }
+  } catch (err) {
+    console.error('Watchdog status error:', err);
+  }
+}
+
+async function qaToggleWatchdog() {
+  try {
+    const res = await api.qa.watchdogToggle();
+    toast(res.settings.enabled ? '🟢 Watchdog Engine Enabled' : '🔴 Watchdog Engine Disabled', 'info');
+    await qaLoadWatchdogStatus();
+  } catch (err) {
+    toast(`Watchdog toggle error: ${err.message}`, 'error');
+  }
+}
+
+async function qaSaveWatchdogRules() {
+  try {
+    const rules = {
+      autoRestartUnhealthy: document.getElementById('rule-unhealthy').checked,
+      autoRestartExited: document.getElementById('rule-exited').checked,
+      ramSpikeProtection: document.getElementById('rule-ram').checked,
+      crashLoopProtection: document.getElementById('rule-crashloop').checked,
+    };
+    await api.qa.watchdogRules(rules);
+    toast('✅ Watchdog rules updated', 'success');
+  } catch (err) {
+    toast(`Failed to update rules: ${err.message}`, 'error');
+  }
+}
+
 function escapeHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+

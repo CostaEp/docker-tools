@@ -5,7 +5,7 @@ services:
     build:
       context: ./services/gateway
       dockerfile: Dockerfile
-    image: docker-tools-gateway:2.3.0
+    image: docker-tools-gateway:2.4.0
     container_name: mobydock-gateway
     command:
       - "--api.insecure=true"
@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     labels:
       com.mobydock.component: "gateway"
-      com.mobydock.version: "2.3.0"
+      com.mobydock.version: "2.4.0"
       com.mobydock.managed-by: "docker-compose"
 
   # ── Core — Containers, Images, Networks, Volumes, Stats, Compose, K8s, UI ──
@@ -36,7 +36,7 @@ services:
     build:
       context: .
       dockerfile: ./services/core/Dockerfile
-    image: docker-tools-core:2.3.0
+    image: docker-tools-core:2.4.0
     container_name: mobydock-core
     expose:
       - "3001"
@@ -57,7 +57,7 @@ services:
       start_period: 15s
     labels:
       com.mobydock.component: "core"
-      com.mobydock.version: "2.3.0"
+      com.mobydock.version: "2.4.0"
       com.mobydock.managed-by: "docker-compose"
 
   # ── QA — Quality scoring, telemetry, diagnostics ─────────────────────
@@ -65,7 +65,7 @@ services:
     build:
       context: .
       dockerfile: ./services/qa/Dockerfile
-    image: docker-tools-qa:2.3.0
+    image: docker-tools-qa:2.4.0
     container_name: mobydock-qa
     expose:
       - "3002"
@@ -86,7 +86,7 @@ services:
       start_period: 15s
     labels:
       com.mobydock.component: "qa"
-      com.mobydock.version: "2.3.0"
+      com.mobydock.version: "2.4.0"
       com.mobydock.managed-by: "docker-compose"
 
   # ── Files — File explorer, chmod, chown, read, write ─────────────────
@@ -94,7 +94,7 @@ services:
     build:
       context: .
       dockerfile: ./services/files/Dockerfile
-    image: docker-tools-files:2.3.0
+    image: docker-tools-files:2.4.0
     container_name: mobydock-files
     expose:
       - "3003"
@@ -115,7 +115,7 @@ services:
       start_period: 15s
     labels:
       com.mobydock.component: "files"
-      com.mobydock.version: "2.3.0"
+      com.mobydock.version: "2.4.0"
       com.mobydock.managed-by: "docker-compose"
 
   # ── Terminal — WebSocket PTY, xterm.js stream demuxer ────────────────
@@ -123,7 +123,7 @@ services:
     build:
       context: .
       dockerfile: ./services/terminal/Dockerfile
-    image: docker-tools-terminal:2.3.0
+    image: docker-tools-terminal:2.4.0
     container_name: mobydock-terminal
     expose:
       - "3004"
@@ -142,7 +142,7 @@ services:
       start_period: 15s
     labels:
       com.mobydock.component: "terminal"
-      com.mobydock.version: "2.3.0"
+      com.mobydock.version: "2.4.0"
       com.mobydock.managed-by: "docker-compose"
 
 volumes:
