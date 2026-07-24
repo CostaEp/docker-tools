@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [2.2.0] - 2026-07-23 — Container QA Workbench, Telemetry & File Permissions Release
+## [2.2.0] - 2026-07-24 — Microservices Architecture, Container QA Workbench & File Permissions Release
+
+### 🏗️ Architecture
+- **Modular Microservices Architecture**: Decoupled backend into fault-isolated modules — `/api/files/*` (File Explorer), `/api/qa/*` (QA Telemetry & Scoring), WebSocket PTY Terminal, and Core REST Gateway.
+- **Persistent SQLite/JSON Data Store** (`backend/db/index.js`): QA score history, Compose stack templates, audit logs, backup schedules, and settings survive container restarts via `/app/data/store.json`.
+- **K8s-Ready Docker Compose Labels**: Service labels (`com.dockerforge.component`, `com.dockerforge.version`) map directly to Kubernetes `Deployment`/`Service`/`ConfigMap` selector patterns for future K8s migration.
+- **Deep GateScanner AV Purge**: `Dockerfile` and `package-release.sh` fully strip npm cache (`/root/.npm`, `/root/.cache`), all `*.bare`, `*.exe`, `*.dll`, `win32*`, `darwin*` directories. Verified `0 .bare files` in release tarball.
+
 
 ### 🚀 Added
 - **Container QA & Debugging Workbench (`#qa`)**:

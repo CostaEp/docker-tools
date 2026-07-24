@@ -26,9 +26,15 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **Live Path & File Autocomplete**: Floating glassmorphism autocomplete dropdown supporting **Tab**, Arrow keys, Enter, and Click selection.
 - ✅ **Stream Demuxing & UTF-8 Font Support**: Custom Docker binary stream parser eliminating base64 corruption and supporting all UTF-8 characters and code files.
 
+### 🏗️ v2.2.0 — Modular Microservices Architecture & Container QA Workbench [COMPLETED]
+- ✅ **Modular Microservices Architecture**: Decoupled backend into fault-isolated modules — `/api/files/*` (File Explorer microservice), `/api/qa/*` (QA Telemetry & Scoring), WebSocket PTY Terminal, and Core REST Gateway.
+- ✅ **Persistent SQLite/JSON Data Store**: QA history, Compose templates, audit logs, and backup schedules stored in `/app/data/store.json` surviving container restarts.
+- ✅ **K8s-Ready Docker Compose Labels**: Service labels map cleanly to Kubernetes `Deployment`/`Service`/`ConfigMap` selectors for future migration.
+- ✅ **Container QA Workbench**: Quality score (0-100, Grade A-F), live SVG telemetry sparklines (RAM, CPU, Storage), and 1-click live fixes.
+- ✅ **Live Container File Explorer & Permissions (`chmod`/`chown`)**: Stream demuxer, UTF-8 font support, live path autocomplete, colorized permission badges.
+
 ---
 
-## 🔮 Upcoming Release Roadmap
 
 ### 🛡️ v2.3.0 — Offline Security & Vulnerability Scanning Engine (Target A)
 - **Offline Trivy / Grype Vulnerability Scanner**: Integrate static image vulnerability scanning for local Docker/Podman images without requiring external internet.

@@ -1,10 +1,9 @@
-version: '3.8'
-
 services:
   dockerforge:
     build:
       context: .
       dockerfile: Dockerfile
+    image: docker-tools-dockerforge:2.2.0
     container_name: dockerforge
     ports:
       - "9090:3000"
@@ -14,12 +13,24 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # Microservice health & isolation labels
+      - SERVICE_NAME=dockerforge-core
+      - DB_PATH=/app/data/store.json
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 10s
+    labels:
+      # Future K8s migration labels (matches Deployment selector pattern)
+      com.dockerforge.component: "core"
+      com.dockerforge.version: "2.2.0"
+      com.dockerforge.managed-by: "docker-compose"
 
 volumes:
   dockerforge_data:
+    driver: local
+    labels:
+      com.dockerforge.purpose: "persistent-store"

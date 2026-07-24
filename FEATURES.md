@@ -1,6 +1,6 @@
 # Feature Matrix & System Architecture — DockerForge v2.2.0
 
-DockerForge is an enterprise-ready, self-hosted Docker management Web UI designed for air-gapped environments, standalone servers, and developer machines.
+DockerForge is an enterprise-ready, self-hosted Docker management Web UI built on a **Modular Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
 
 ---
 
@@ -42,6 +42,10 @@ DockerForge is an enterprise-ready, self-hosted Docker management Web UI designe
 | **Spec Exporter** | Multi-Format Export | Reverse-engineer container inspect to Docker Compose YAML, Dockerfile, K8s Pod YAML, and Helm Charts | ✅ Completed |
 | **Compose Builder** | Visual Node Graph | Drag-and-drop interactive microservices canvas, bezier connections, live docker-compose.yml sync, instant stack deployment | ✅ Completed |
 | | Presets & Load | Quick templates (Postgres, Oracle Server, Oracle Client), local image dropdown, offline `.tar.gz` image load stream | ✅ Completed |
+| **Microservices** | Fault Isolation | Decoupled modules (QA, Files, Terminal, Core) — failure in one module does not affect others | ✅ Completed |
+| | Persistent Store | JSON/SQLite persistent data store (`/app/data/store.json`) for QA history, templates, audit logs | ✅ Completed |
+| | Dedicated File Microservice | `/api/files/*` isolated from `/api/qa/*` for independent scaling and fault isolation | ✅ Completed |
+| | K8s-Ready Labels | Docker Compose labels map directly to K8s `Deployment`/`Service`/`ConfigMap` selectors | ✅ Completed |
 | **Air-Gap** | Offline Ready | 100% bundled vendor assets, zero external CDN calls, stripped non-Linux binaries (GateScanner compliant), works offline in RHEL 9 | ✅ Completed |
 
 ---
@@ -49,31 +53,35 @@ DockerForge is an enterprise-ready, self-hosted Docker management Web UI designe
 ## 🏛️ System Architecture
 
 ```
-                                ┌──────────────────────────────────┐
-                                │       Web Browser (Client)       │
-                                │  Vanilla JS + xterm.js + Chart.js │
-                                └────────────────┬─────────────────┘
-                                                 │ HTTP / WebSockets
-                                                 ▼
+                                  ┌──────────────────────────────────────┐
+                                  │   Web Browser (Vanilla JS SPA)       │
+                                  │   /api/qa/*  /api/files/*  WS:term   │
+                                  └────────────────┬─────────────────────┘
+                                                   │ HTTP / WebSockets
+                                                   ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│ DockerForge Container (Node.js 20)                                               │
+│ DockerForge Container (Node.js 20 — Microservices Gateway)                       │
 │                                                                                 │
-│  ┌───────────────────────┐   ┌──────────────────────┐   ┌────────────────────┐ │
-│  │ Express REST API      │   │ Socket.IO WebSockets │   │ Offline Static UI  │ │
-│  │ /api/qa (Score, Tele) │   │ Terminal TTY Stream  │   │ /frontend/vendor/  │ │
-│  │ /api/compose / /files │   │ Stream Demuxer Engine│   │ index.html         │ │
-│  └───────────┬───────────┘   └──────────┬───────────┘   └────────────────────┘ │
-│              │                          │                                       │
-│              └────────────┬─────────────┘                                       │
-│                           ▼                                                     │
-│                dockerode (Docker API)                                           │
-│                 + /bin/sh exec helpers                                          │
-│                           │                                                     │
-└───────────────────────────┼─────────────────────────────────────────────────────┘
-                            │ /var/run/docker.sock
-                            ▼
-           ┌──────────────────────────────────┐
-           │   Host Docker Daemon / Podman    │
-           │        (RHEL 9 / Mac / Linux)    │
-           └──────────────────────────────────┘
+│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ /api/qa         │  │ /api/files      │  │ WebSocket    │  │ Static UI    │  │
+│  │ QA Telemetry &  │  │ File Explorer   │  │ PTY Terminal │  │ /frontend/   │  │
+│  │ Scoring Engine  │  │ chmod/chown     │  │ Demuxer      │  │ vendor/      │  │
+│  └────────┬────────┘  └────────┬────────┘  └──────┬───────┘  └──────────────┘  │
+│           │                   │                   │                             │
+│           └───────────────────┼───────────────────┘                             │
+│                               ▼                                                 │
+│              ┌────────────────────────────────┐                                 │
+│              │  backend/db/index.js            │                                 │
+│              │  Persistent Store              │                                 │
+│              │  /app/data/store.json          │                                 │
+│              └───────────────┬────────────────┘                                 │
+│                              │                                                  │
+│                     dockerode (Docker API)                                      │
+└──────────────────────────────┼──────────────────────────────────────────────────┘
+                               │ /var/run/docker.sock
+                               ▼
+            ┌──────────────────────────────────┐
+            │   Host Docker Daemon / Podman    │
+            │        (RHEL 9 / Mac / Linux)    │
+            └──────────────────────────────────┘
 ```

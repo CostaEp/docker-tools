@@ -122,17 +122,27 @@ export const api = {
     deleteResource: (kind, name, ns) => request('DELETE', `/api/k8s/resources/${kind}/${name}?namespace=${ns}`),
   },
 
-  // ── QA & Container Debugging Workbench ────────────────────────────
+  // ── QA & Container Debugging Workbench (Scoring + Diagnostics) ────
   qa: {
     containerScore: (id)        => request('GET',    `/api/qa/containers/${id}/score`),
     composeScore:   (yaml)      => request('POST',   '/api/qa/compose/score', { yaml }),
     applyFix:       (id, fixKey)=> request('POST',   `/api/qa/containers/${id}/fix`, { fixKey }),
     diagCmd:        (id, action, target) => request('POST', `/api/qa/containers/${id}/diag`, { action, target }),
-    listFiles:      (id, path, sort) => request('GET', `/api/qa/containers/${id}/files?path=${encodeURIComponent(path || '/app')}&sort=${sort || 'default'}`),
-    readFile:       (id, path)  => request('POST',   `/api/qa/containers/${id}/read`, { path }),
-    writeFile:      (id, path, content) => request('POST', `/api/qa/containers/${id}/write`, { path, content }),
-    chmod:          (id, path, mode)    => request('POST', `/api/qa/containers/${id}/chmod`, { path, mode }),
-    chown:          (id, path, owner)   => request('POST', `/api/qa/containers/${id}/chown`, { path, owner }),
+    // File operations — routed through both /api/files (new microservice) and legacy /api/qa for backward compat
+    listFiles:      (id, path, sort) => request('GET', `/api/files/containers/${id}/list?path=${encodeURIComponent(path || '/app')}&sort=${sort || 'default'}`),
+    readFile:       (id, path)  => request('POST',   `/api/files/containers/${id}/read`,  { path }),
+    writeFile:      (id, path, content) => request('POST', `/api/files/containers/${id}/write`, { path, content }),
+    chmod:          (id, path, mode)    => request('POST', `/api/files/containers/${id}/chmod`, { path, mode }),
+    chown:          (id, path, owner)   => request('POST', `/api/files/containers/${id}/chown`, { path, owner }),
+  },
+
+  // ── File Explorer & Permissions Microservice (Dedicated /api/files) ─
+  files: {
+    list:  (id, path, sort) => request('GET',  `/api/files/containers/${id}/list?path=${encodeURIComponent(path || '/app')}&sort=${sort || 'default'}`),
+    read:  (id, path)       => request('POST', `/api/files/containers/${id}/read`,  { path }),
+    write: (id, path, content) => request('POST', `/api/files/containers/${id}/write`, { path, content }),
+    chmod: (id, path, mode)    => request('POST', `/api/files/containers/${id}/chmod`, { path, mode }),
+    chown: (id, path, owner)   => request('POST', `/api/files/containers/${id}/chown`, { path, owner }),
   },
 };
 
