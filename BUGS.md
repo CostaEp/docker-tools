@@ -114,6 +114,15 @@ This document tracks identified edge cases, reported issues, and resolution hist
 
 ---
 
+### [BUG-013] Nginx Reverse Proxy Gateway Upstream DNS Resolution Failure on Startup
+- **Severity**: High
+- **Description**: `mobydock-gateway` failed to start or entered crash loops (`[emerg] host not found in upstream "mobydock-qa:3002"`) if any backend microservice container was starting or restarting.
+- **Root Cause**: Nginx static `upstream` block resolves hostnames once on startup. If a container IP changed or DNS wasn't ready yet, Nginx exited immediately.
+- **Resolution**: Updated `nginx.conf` with Docker's internal DNS resolver (`resolver 127.0.0.11 valid=10s ipv6=off;`) and variable-based `proxy_pass` targets (`set $target_qa http://mobydock-qa:3002; proxy_pass $target_qa;`), enabling dynamic hostname resolution and 100% fault isolation.
+- **Status**: Fixed in v2.2.0.
+
+---
+
 ## Known Limitations
 
 - **Distroless Containers**: Containers without `/bin/sh` or `/bin/bash` cannot launch interactive TTY sessions (standard Docker behavior; non-interactive exec is available via Container Inspect/Exec tab).

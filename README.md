@@ -1,24 +1,29 @@
 # 🐳 MobyDock v2.2.0
 
-> **Enterprise Docker & Podman Management — Modular Microservices Architecture, Container QA Workbench, Resource Telemetry, Live Permissions Manager, Compose Builder, and Spec Exporters**
+> **Enterprise Docker & Podman Management — True 5-Container Microservices Architecture, Nginx Gateway, Container QA Workbench, Resource Telemetry, Live Permissions Manager, Compose Builder, and Spec Exporters**
 
 ![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-RHEL%209%20%7C%20Linux%20%7C%20macOS-orange.svg)
 ![Air--Gap](https://img.shields.io/badge/Air--Gapped-100%25%20Offline-success.svg)
-![Architecture](https://img.shields.io/badge/architecture-Microservices-purple.svg)
+![Architecture](https://img.shields.io/badge/architecture-Microservices%20(5%20Containers)-purple.svg)
 
-**MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **Modular Microservices Architecture** where each sub-system runs as a decoupled, fault-isolated module — if one module fails, the rest of the system continues operating normally.
+**MobyDock** is a modern, glassmorphic web application for managing Docker and Podman environments. Built for enterprise platforms and air-gapped environments (such as Red Hat Enterprise Linux 9). Features a **True 5-Container Microservices Architecture** orchestrated via `docker-compose.yml` with an Nginx reverse proxy gateway — each sub-system runs in an isolated container with independent healthchecks and restart policies. If one worker fails or restarts, the rest of the system continues operating normally without interruption.
 
 ---
 
 ## ✨ Key Features (v2.2.0)
 
-### 🏗️ Modular Microservices Architecture
-- **Decoupled Backend Modules**: File Explorer, QA Telemetry, Terminal PTY, and Core each run as isolated modules with independent healthchecks and restart policies.
-- **Persistent SQLite Storage** (`/app/data/store.json`): QA score history, Compose stack templates, audit logs, and backup schedules survive container restarts.
-- **Fault Isolation**: If the File Explorer or QA worker encounters an error, container lifecycle management and Terminal remain fully operational.
-- **K8s-Ready Labels**: Docker Compose services are labeled to map directly to Kubernetes `Deployment`, `Service`, and `ConfigMap` resources in future releases.
+### 🏗️ True 5-Container Microservices Architecture
+- **Nginx Reverse Proxy Gateway (`mobydock-gateway`)**: Single public entry point on port `9090`. Uses Docker internal DNS (`127.0.0.11`) for dynamic upstream resolution and zero-downtime routing.
+- **Decoupled Backend Containers**:
+  - `mobydock-core` (Port 3001 internal): Container lifecycle, Images, Networks, Volumes, Stats, Compose, K8s, UI static assets.
+  - `mobydock-qa` (Port 3002 internal): Container Quality Scorecard & real-time telemetry engine.
+  - `mobydock-files` (Port 3003 internal): Container file explorer, UTF-8 base64 editor, live path autocomplete, `chmod`/`chown` controls.
+  - `mobydock-terminal` (Port 3004 internal): WebSocket TTY handler & binary stream demuxer.
+- **Fault Isolation**: Stopping or restarting any worker service (e.g. `mobydock-qa`) leaves all other microservices fully operational.
+- **Persistent Storage** (`mobydock_data` volume → `/app/data/store.json`): QA history, Compose stack templates, audit logs, and settings survive container restarts.
+- **K8s-Ready Labels**: Docker Compose service labels (`com.mobydock.component`) map directly to Kubernetes `Deployment`, `Service`, and `ConfigMap` resources.
 
 ### 🛠️ Container QA & Debugging Workbench
 - **Quality Scorecard & Rating (0-100, Grade A-F)**: Automated security, memory, CPU, healthcheck, user, and restart policy evaluation.
@@ -48,55 +53,54 @@
 
 ---
 
-## 🏛️ Microservices Architecture
+## 🏛️ Microservices Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Web Browser (Vanilla JS SPA)                                       │
-│  /api/qa/* (scoring, diag)   /api/files/* (explorer, chmod, chown) │
-│  /api/containers/*           /api/stats/*   WebSockets (terminal)  │
-└────────────────────────────┬────────────────────────────────────────┘
-                             │ HTTP / WebSocket
-                             ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│  mobydock (Node.js Express Gateway — Port 3000)                  │
-│                                                                     │
-│  ┌─────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │  /api/qa        │  │  /api/files      │  │  WebSocket PTY   │   │
-│  │  QA Telemetry   │  │  File Explorer   │  │  Terminal Worker │   │
-│  │  Scoring Engine │  │  chmod/chown     │  │  Stream Demuxer  │   │
-│  └────────┬────────┘  └────────┬─────────┘  └────────┬─────────┘   │
-│           │                   │                      │              │
-│           └───────────────────┼──────────────────────┘              │
-│                               ▼                                     │
-│              ┌────────────────────────────┐                         │
-│              │  backend/db/index.js       │                         │
-│              │  Persistent Store (JSON)   │                         │
-│              │  /app/data/store.json      │                         │
-│              └────────────────────────────┘                         │
-│                               │                                     │
-│                      dockerode (Docker API)                         │
-└───────────────────────────────┼─────────────────────────────────────┘
-                                │ /var/run/docker.sock
-                                ▼
-              ┌─────────────────────────────────┐
-              │  Host Docker Daemon / Podman     │
-              │  (RHEL 9 / Mac / Linux)          │
-              └─────────────────────────────────┘
+                       Browser (Client)
+                               │
+                      HTTP / WS  Port 9090
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                 mobydock-gateway (Nginx)                    │
+│            (Docker DNS Resolver: 127.0.0.11)                │
+└──────┬───────────────┬──────────────────┬─────────────────┬─┘
+       │               │                  │                 │
+       │ /*, /api/*    │ /api/qa/*        │ /api/files/*    │ /socket.io/*
+       ▼               ▼                  ▼                 ▼
+┌──────────────┐┌──────────────┐   ┌──────────────┐  ┌──────────────────┐
+│mobydock-core ││  mobydock-qa │   │mobydock-files│  │mobydock-terminal │
+│ (Port 3001)  ││ (Port 3002)  │   │ (Port 3003)  │  │   (Port 3004)    │
+│  Containers  ││  QA Scoring  │   │ File Explorer│  │  WebSocket PTY   │
+│  Images, K8s ││  Telemetry   │   │ chmod/chown  │  │  Stream Demuxer  │
+└──────┬───────┘└──────┬───────┘   └──────┬───────┘  └────────┬─────────┘
+       │               │                  │                   │
+       └───────────────┼──────────────────┴───────────────────┘
+                       ▼
+         ┌──────────────────────────┐
+         │ backend/db/index.js      │
+         │ Persistent JSON Store    │
+         │ /app/data/store.json     │
+         └─────────────┬────────────┘
+                       │ /var/run/docker.sock
+                       ▼
+         ┌──────────────────────────┐
+         │ Host Docker / Podman     │
+         │ (RHEL 9 / Linux / macOS) │
+         └──────────────────────────┘
 ```
 
 ---
 
 ## 🚀 Quickstart
 
-### Option 1: Docker Compose
+### Option 1: Docker Compose (5 Microservice Containers)
 
 ```bash
 # Clone repository
 git clone https://github.com/CostaEp/docker-tools.git
 cd docker-tools
 
-# Build and start container
+# Build and start all 5 microservices
 docker compose up -d --build
 ```
 Access the Web UI at **`http://localhost:9090`**.
@@ -121,12 +125,8 @@ Access the Web UI at **`http://localhost:9090`**.
    # Enable Podman socket service
    systemctl enable --now podman.socket
 
-   # Load image tarball & run
-   podman load -i mobydock-2.2.0-image.tar
-   podman run -d --name mobydock -p 9090:3000 \
-     -v /run/podman/podman.sock:/var/run/docker.sock \
-     -v mobydock_data:/app/data \
-     docker-tools-mobydock:2.2.0
+   # Load image tarball & run compose
+   podman-compose up -d
    ```
 
 ---
@@ -146,14 +146,15 @@ docker-tools/
 │   │   ├── security.js       # Security Audit (/api/security/*)
 │   │   └── ...               # images, networks, volumes, stats, k8s
 │   ├── terminal/             # PTY WebSocket stream demuxer & handler
-│   └── server.js             # Express Gateway — mounts all microservice routes
+│   └── server.js             # Express Gateway — SERVICE_MODE routing
 ├── frontend/
 │   ├── pages/                # UI modules (qa, compose, dashboard, terminal, logs…)
 │   ├── api.js                # API client — /api/files/* + /api/qa/* routing
 │   └── vendor/               # 100% bundled offline assets (xterm.js, Chart.js…)
+├── nginx.conf                # Nginx Reverse Proxy Gateway config (port 9090)
 ├── scripts/
 │   └── package-release.sh    # Air-Gap release packager (GateScanner AV compliant)
-├── docker-compose.yml        # Orchestration with K8s-ready labels & healthchecks
+├── docker-compose.yml        # Orchestration for 5 microservice containers
 ├── Dockerfile                # Multi-stage build with deep npm cache purge
 ├── CHANGELOG.md              # Semantic version history (SemVer)
 ├── ROADMAP.md                # Future version pipeline

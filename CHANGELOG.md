@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **[BUG-010]**: Fixed double path concatenation in file explorer input (`/etc/hosts//etc/hosts`).
 - **[BUG-011]**: Implemented custom Docker binary stream demuxer (`execInContainer`), parsing 8-byte frame length headers (`readUInt32BE(4)`) to eliminate base64 corruption and garbled text (`q\j{h...`).
 - **[BUG-012]**: Overhauled QA Workbench page to a 100% full-width single-column vertical stack layout, resolving 2-column scorecard text truncation.
+- **[BUG-013]**: Fixed Nginx gateway DNS resolution failure on container startup by implementing Docker internal DNS resolver (`127.0.0.11`) and dynamic variable proxy target resolution (`set $target_qa http://mobydock-qa:3002; proxy_pass $target_qa;`).
 
 ---
 

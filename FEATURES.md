@@ -1,6 +1,6 @@
 # Feature Matrix & System Architecture — MobyDock v2.2.0
 
-MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a **Modular Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
+MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a **True 5-Container Microservices Architecture** for maximum fault-isolation, Air-Gapped deployments, and future Kubernetes migration.
 
 ---
 
@@ -42,9 +42,10 @@ MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a
 | **Spec Exporter** | Multi-Format Export | Reverse-engineer container inspect to Docker Compose YAML, Dockerfile, K8s Pod YAML, and Helm Charts | ✅ Completed |
 | **Compose Builder** | Visual Node Graph | Drag-and-drop interactive microservices canvas, bezier connections, live docker-compose.yml sync, instant stack deployment | ✅ Completed |
 | | Presets & Load | Quick templates (Postgres, Oracle Server, Oracle Client), local image dropdown, offline `.tar.gz` image load stream | ✅ Completed |
-| **Microservices** | Fault Isolation | Decoupled modules (QA, Files, Terminal, Core) — failure in one module does not affect others | ✅ Completed |
+| **Microservices** | 5-Container Architecture | `mobydock-gateway`, `mobydock-core`, `mobydock-qa`, `mobydock-files`, `mobydock-terminal` | ✅ Completed |
+| | Dynamic Nginx Resolver | Docker DNS resolver (`127.0.0.11`) for zero-downtime routing during backend microservice restarts | ✅ Completed |
+| | Fault Isolation | Decoupled containers — failure in one module (e.g. QA) does not affect others | ✅ Completed |
 | | Persistent Store | JSON/SQLite persistent data store (`/app/data/store.json`) for QA history, templates, audit logs | ✅ Completed |
-| | Dedicated File Microservice | `/api/files/*` isolated from `/api/qa/*` for independent scaling and fault isolation | ✅ Completed |
 | | K8s-Ready Labels | Docker Compose labels map directly to K8s `Deployment`/`Service`/`ConfigMap` selectors | ✅ Completed |
 | **Air-Gap** | Offline Ready | 100% bundled vendor assets, zero external CDN calls, stripped non-Linux binaries (GateScanner compliant), works offline in RHEL 9 | ✅ Completed |
 
@@ -53,35 +54,35 @@ MobyDock is an enterprise-ready, self-hosted Docker management Web UI built on a
 ## 🏛️ System Architecture
 
 ```
-                                  ┌──────────────────────────────────────┐
-                                  │   Web Browser (Vanilla JS SPA)       │
-                                  │   /api/qa/*  /api/files/*  WS:term   │
-                                  └────────────────┬─────────────────────┘
-                                                   │ HTTP / WebSockets
-                                                   ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│ MobyDock Container (Node.js 20 — Microservices Gateway)                       │
-│                                                                                 │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │ /api/qa         │  │ /api/files      │  │ WebSocket    │  │ Static UI    │  │
-│  │ QA Telemetry &  │  │ File Explorer   │  │ PTY Terminal │  │ /frontend/   │  │
-│  │ Scoring Engine  │  │ chmod/chown     │  │ Demuxer      │  │ vendor/      │  │
-│  └────────┬────────┘  └────────┬────────┘  └──────┬───────┘  └──────────────┘  │
-│           │                   │                   │                             │
-│           └───────────────────┼───────────────────┘                             │
-│                               ▼                                                 │
-│              ┌────────────────────────────────┐                                 │
-│              │  backend/db/index.js            │                                 │
-│              │  Persistent Store              │                                 │
-│              │  /app/data/store.json          │                                 │
-│              └───────────────┬────────────────┘                                 │
-│                              │                                                  │
-│                     dockerode (Docker API)                                      │
-└──────────────────────────────┼──────────────────────────────────────────────────┘
-                               │ /var/run/docker.sock
+                       Browser (Client)
+                               │
+                      HTTP / WS  Port 9090
                                ▼
-            ┌──────────────────────────────────┐
-            │   Host Docker Daemon / Podman    │
-            │        (RHEL 9 / Mac / Linux)    │
-            └──────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                 mobydock-gateway (Nginx)                    │
+│            (Docker DNS Resolver: 127.0.0.11)                │
+└──────┬───────────────┬──────────────────┬─────────────────┬─┘
+       │               │                  │                 │
+       │ /*, /api/*    │ /api/qa/*        │ /api/files/*    │ /socket.io/*
+       ▼               ▼                  ▼                 ▼
+┌──────────────┐┌──────────────┐   ┌──────────────┐  ┌──────────────────┐
+│mobydock-core ││  mobydock-qa │   │mobydock-files│  │mobydock-terminal │
+│ (Port 3001)  ││ (Port 3002)  │   │ (Port 3003)  │  │   (Port 3004)    │
+│  Containers  ││  QA Scoring  │   │ File Explorer│  │  WebSocket PTY   │
+│  Images, K8s ││  Telemetry   │   │ chmod/chown  │  │  Stream Demuxer  │
+└──────┬───────┘└──────┬───────┘   └──────┬───────┘  └────────┬─────────┘
+       │               │                  │                   │
+       └───────────────┼──────────────────┴───────────────────┘
+                       ▼
+         ┌──────────────────────────┐
+         │ backend/db/index.js      │
+         │ Persistent JSON Store    │
+         │ /app/data/store.json     │
+         └─────────────┬────────────┘
+                       │ /var/run/docker.sock
+                       ▼
+         ┌──────────────────────────┐
+         │ Host Docker / Podman     │
+         │ (RHEL 9 / Linux / macOS) │
+         └──────────────────────────┘
 ```
