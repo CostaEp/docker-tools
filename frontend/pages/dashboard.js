@@ -533,7 +533,7 @@ function kv(k, v) {
   `;
 }
 
-function statusBadge(state) {
+export function statusBadge(state) {
   const map = {
     running: 'badge-running',
     exited: 'badge-exited',
@@ -543,12 +543,12 @@ function statusBadge(state) {
   return `<span class="badge ${map[state] || 'badge-secondary'}">${state}</span>`;
 }
 
-function formatName(names) {
+export function formatName(names) {
   if (!names || !names.length) return '—';
   return names[0].replace(/^\//, '');
 }
 
-function formatPorts(ports) {
+export function formatPorts(ports) {
   if (!ports || !ports.length) return '—';
   return ports
     .filter(p => p.PublicPort)
