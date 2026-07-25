@@ -44,6 +44,13 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **GateScanner AV Sanitized (0 Non-Linux Files)**: Purged all non-Linux binaries (`0 .bare / .exe / .dll`).
 - ✅ **Bundled Archives**: Deployable `mobydock-v2.4.5-airgap-rhel9.zip` (134MB) and `mobydock-v2.4.5-airgap-rhel9.tar.gz` (131MB).
 
+### 🔍 v2.6.0 — Unified Multi-Container Live Log Aggregator (Loki / Kibana Style) [COMPLETED]
+- ✅ **Multi-Container Log Stream Aggregation**: Concurrent log streaming across all microservices and user containers into a single unified stream.
+- ✅ **Colorized Container Badges**: Distinct glowing color tags for each container (`mobydock-gateway`, `mobydock-core`, `mobydock-qa`, `mobydock-files`, `mobydock-terminal`).
+- ✅ **Multi-Select Toggle Toolbar**: Enable/disable specific containers in the stream in real-time.
+- ✅ **Log Severity & Regex Filtering**: Live severity parsing (`ERROR`, `WARN`, `INFO`, `DEBUG`) with regex search filter.
+- ✅ **Feed Controls**: `Pause / Resume` feed auto-scroll, `Copy Stream`, and `Download (.txt)`.
+
 ---
 
 

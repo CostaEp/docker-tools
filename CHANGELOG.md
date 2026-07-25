@@ -5,6 +5,18 @@ All notable changes to the MobyDock project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.6.0] - 2026-07-26 — Unified Multi-Container Live Log Aggregator Release
+
+### 🔍 Unified Log Stream & Aggregator (Loki / Kibana Style)
+- **Multi-Container Live Stream Aggregation**: Stream stdout/stderr logs from all 5 microservices (`gateway`, `core`, `qa`, `files`, `terminal`) and user database containers simultaneously into a single unified stream.
+- **Colorized Container Badges**: Distinct glowing color tags per microservice for instant visual identification.
+- **Per-Container Multi-Select Toolbar**: Toggle individual containers in/out of the stream with 1-click `Select All` and `Deselect All` controls.
+- **Log Severity Parser & Badges**: Auto-parses `ERROR`, `WARN`, `INFO`, `DEBUG` entries with live count badges (`cnt-error`, `cnt-warn`, etc.).
+- **Regex & Search Filters**: Real-time keyword and regular expression (`Regex`) search filter matching log lines.
+- **Feed Controls & Export**: `Pause / Resume` feed auto-scroll, `Copy Stream`, `Download Logs (.txt)`, and `Clear Stream`.
+
+---
+
 ## [2.5.0] - 2026-07-24 — Air-Gap RHEL 9 Bundle & Offline Installer Release
 
 ### 📦 Air-Gap Stack Bundler & Offline Packages
