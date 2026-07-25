@@ -557,7 +557,7 @@ function formatPorts(ports) {
     .join(', ');
 }
 
-function formatBytes(bytes) {
+export function formatBytes(bytes) {
   if (!bytes) return '0 B';
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
