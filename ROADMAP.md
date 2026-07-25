@@ -51,6 +51,12 @@ This document outlines the official product roadmap and technical specifications
 - ✅ **Log Severity & Regex Filtering**: Live severity parsing (`ERROR`, `WARN`, `INFO`, `DEBUG`) with regex search filter.
 - ✅ **Feed Controls**: `Pause / Resume` feed auto-scroll, `Copy Stream`, and `Download (.txt)`.
 
+### 🎨 v2.7.0 — Container Stats Heatmap Dashboard [COMPLETED]
+- ✅ **Interactive Heatmap Tile Grid**: Responsive tile grid showing CPU and RAM heat levels across all containers in the stack.
+- ✅ **Dynamic HSL/CSS Severity Tinting**: Green (0-40%), Amber (40-75%), and Red Pulsing Glow (>75%).
+- ✅ **Hotspot Metrics Header**: Live calculation of Highest CPU Hotspot, Highest Memory Hotspot, and Stack Average Load.
+- ✅ **5s Auto-Polling**: Real-time background update engine.
+
 ---
 
 

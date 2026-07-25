@@ -5,6 +5,19 @@ All notable changes to the MobyDock project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-07-26 — Container Stats Heatmap Dashboard Release
+
+### 🎨 Stack Health & Resource Heatmap Grid
+- **Live Tile Grid Dashboard**: Interactive responsive Heatmap tile grid in `Dashboard` showing all running and stopped containers.
+- **Dynamic Color Severity Scale**: Automatic CSS gradient tinting & glowing borders based on combined CPU/RAM metrics:
+  - `🟢 Green (Heat Low)`: Normal operation (<40% load).
+  - `🟡 Amber (Heat Medium)`: Moderate load (40%–75% load).
+  - `🔴 Red Pulsing Glow (Heat High)`: Critical hotspot (>75% load).
+- **Hotspot Metrics Summary**: Real-time summary header calculating `Highest CPU Hotspot`, `Highest Memory Hotspot`, and `Stack Load Average`.
+- **5-Second Live Polling Engine**: Automatic background updates keeping the entire heatmap live.
+
+---
+
 ## [2.6.0] - 2026-07-26 — Unified Multi-Container Live Log Aggregator Release
 
 ### 🔍 Unified Log Stream & Aggregator (Loki / Kibana Style)
