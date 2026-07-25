@@ -26,19 +26,29 @@ router.get('/', async (req, res) => {
 });
 
 function formatStats(stats) {
+  if (!stats) return { cpuPercent: 0, memUsed: 0, memLimit: 0, memPercent: 0, netRx: 0, netTx: 0, blkRead: 0, blkWrite: 0, pids: 0, memUsageFormatted: '0 B' };
+
   // CPU
-  const cpuDelta =
-    stats.cpu_stats.cpu_usage.total_usage -
-    stats.precpu_stats.cpu_usage.total_usage;
-  const systemDelta =
-    stats.cpu_stats.system_cpu_usage - stats.precpu_stats.system_cpu_usage;
-  const numCpus = stats.cpu_stats.online_cpus || stats.cpu_stats.cpu_usage.percpu_usage?.length || 1;
-  const cpuPercent = systemDelta > 0 ? (cpuDelta / systemDelta) * numCpus * 100 : 0;
+  let cpuPercent = 0;
+  try {
+    const totalUsage = stats.cpu_stats?.cpu_usage?.total_usage || 0;
+    const preTotalUsage = stats.precpu_stats?.cpu_usage?.total_usage || 0;
+    const cpuDelta = totalUsage - preTotalUsage;
+    const systemDelta = (stats.cpu_stats?.system_cpu_usage || 0) - (stats.precpu_stats?.system_cpu_usage || 0);
+    const numCpus = stats.cpu_stats?.online_cpus || stats.cpu_stats?.cpu_usage?.percpu_usage?.length || 1;
+    if (systemDelta > 0 && cpuDelta > 0) {
+      cpuPercent = (cpuDelta / systemDelta) * numCpus * 100;
+    }
+  } catch (_) {}
 
   // Memory
-  const memUsed = stats.memory_stats.usage - (stats.memory_stats.stats?.cache || 0);
-  const memLimit = stats.memory_stats.limit;
-  const memPercent = memLimit > 0 ? (memUsed / memLimit) * 100 : 0;
+  let memUsed = 0, memLimit = 0, memPercent = 0;
+  try {
+    memUsed = (stats.memory_stats?.usage || 0) - (stats.memory_stats?.stats?.cache || 0);
+    if (memUsed < 0) memUsed = stats.memory_stats?.usage || 0;
+    memLimit = stats.memory_stats?.limit || 0;
+    memPercent = memLimit > 0 ? (memUsed / memLimit) * 100 : 0;
+  } catch (_) {}
 
   // Network
   let netRx = 0, netTx = 0;
@@ -53,15 +63,24 @@ function formatStats(stats) {
   let blkRead = 0, blkWrite = 0;
   const blkStats = stats.blkio_stats?.io_service_bytes_recursive || [];
   for (const entry of blkStats) {
-    if (entry.op === 'Read') blkRead += entry.value;
-    if (entry.op === 'Write') blkWrite += entry.value;
+    if (entry.op === 'Read') blkRead += entry.value || 0;
+    if (entry.op === 'Write') blkWrite += entry.value || 0;
   }
 
+  const formatB = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
   return {
-    cpuPercent: parseFloat(cpuPercent.toFixed(2)),
+    cpuPercent: parseFloat((cpuPercent || 0).toFixed(2)),
     memUsed,
     memLimit,
-    memPercent: parseFloat(memPercent.toFixed(2)),
+    memPercent: parseFloat((memPercent || 0).toFixed(2)),
+    memUsageFormatted: formatB(memUsed),
     netRx,
     netTx,
     blkRead,

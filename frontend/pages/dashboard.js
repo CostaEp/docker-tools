@@ -261,16 +261,23 @@ async function loadDashboard(container) {
       `;
     }
 
-    // Live stats for running containers
+    // Initial render of Heatmap Grid (Instant UI render)
+    renderHeatmapGrid(containers, {});
+
+    // Non-blocking fetch for live container stats
     let statsMap = {};
     if (running.length > 0) {
       try {
-        const statsArr = await api.stats.all();
-        statsArr.forEach(s => statsMap[s.id] = s);
+        const fetchStatsPromise = api.stats.all();
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve([]), 2500));
+        const statsArr = await Promise.race([fetchStatsPromise, timeoutPromise]);
+        if (Array.isArray(statsArr)) {
+          statsArr.forEach(s => { if (s && s.id) statsMap[s.id] = s; });
+        }
       } catch (_) {}
     }
 
-    // Render Container Heatmap Grid
+    // Re-render Container Heatmap Grid with live stats
     renderHeatmapGrid(containers, statsMap);
 
     // Running containers mini list
