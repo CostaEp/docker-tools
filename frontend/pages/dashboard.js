@@ -4,7 +4,6 @@
 import api from '/api.js';
 import toast from '/toast.js';
 import { confirmModal } from '/modal.js';
-import { navigateTo } from '/main.js';
 
 let dashPollTimer = null;
 
@@ -500,10 +499,10 @@ async function handleAction(action, id, container) {
         return;
       }
     } else if (action === 'terminal') {
-      navigateTo('terminal', id);
+      if (window.navigateTo) window.navigateTo('terminal', id);
       return;
     } else if (action === 'detail') {
-      navigateTo('containers', id);
+      if (window.navigateTo) window.navigateTo('containers', id);
       return;
     }
     await loadDashboard(container);
